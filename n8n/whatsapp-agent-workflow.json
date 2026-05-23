@@ -1,0 +1,96 @@
+{
+  "name": "IntelliHR WhatsApp AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "id": "w1f7b036-7c9c-4613-8d09-b47209772d1a",
+      "name": "Twilio Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "prompt": "={{ $json.body.Body }}",
+        "options": {
+          "systemMessage": "You are a helpful HR and payroll bot. Return concise, professional answers."
+        }
+      },
+      "id": "w2f7b036-7c9c-4613-8d09-b47209772d1b",
+      "name": "OpenAI Agent Query",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/ai/ask",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"question\": \"{{ $json.body.Body }}\"\n}",
+        "options": {}
+      },
+      "id": "w3f7b036-7c9c-4613-8d09-b47209772d1c",
+      "name": "Ask Local DB AI Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node[\"Twilio Webhook Trigger\"].json.body.From }}",
+        "message": "={{ $json.answer }}"
+      },
+      "id": "w4f7b036-7c9c-4613-8d09-b47209772d1d",
+      "name": "Twilio WhatsApp Dispatch",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Twilio Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ask Local DB AI Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Local DB AI Router": {
+      "main": [
+        [
+          {
+            "node": "Twilio WhatsApp Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

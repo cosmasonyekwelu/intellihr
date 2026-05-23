@@ -1,0 +1,51 @@
+{
+  "name": "IntelliHR Slack Hires Webhook Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-alert-webhook",
+        "options": {}
+      },
+      "id": "s1f7b036-7c9c-4613-8d09-b47209772d1a",
+      "name": "New Hire Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "channelType": "id",
+        "channelId": "C0123456789",
+        "text": "=🎉 *New Hire Alert!* Please welcome *{{ $json.body.employee.name }}* to the company! \n*Role:* {{ $json.body.employee.position }}\n*Department:* {{ $json.body.employee.department }}",
+        "options": {}
+      },
+      "id": "s2f7b036-7c9c-4613-8d09-b47209772d1b",
+      "name": "Post Message to Channel",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "New Hire Trigger": {
+      "main": [
+        [
+          {
+            "node": "Post Message to Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

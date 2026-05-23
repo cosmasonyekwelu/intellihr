@@ -1,0 +1,157 @@
+{
+  "name": "IntelliHR Monthly Payroll Cycle Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "value": 1
+            }
+          ]
+        }
+      },
+      "id": "c1f7b036-7c9c-4613-8d09-b47209772d1f",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payroll-webhook",
+        "options": {}
+      },
+      "id": "e2f7b036-7c9c-4613-8d09-b47209772d1a",
+      "name": "Webhook Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/employees",
+        "options": {}
+      },
+      "id": "b1f7b036-7c9c-4613-8d09-b47209772d1b",
+      "name": "Fetch Employees",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst employees = items[0].json.employees;\nfor (const emp of employees) {\n  const gross = emp.salary;\n  const tax = Math.round(gross * 0.12);\n  const pension = Math.round(gross * 0.08);\n  const loan = 0;\n  const bonus = emp.performanceRating >= 4 ? 500 : 0;\n  const net = gross - (tax + pension + loan) + bonus;\n  results.push({\n    json: {\n      employeeId: emp._id,\n      name: emp.name,\n      email: emp.email,\n      phone: emp.phone,\n      grossSalary: gross,\n      tax,\n      pension,\n      loan,\n      bonus,\n      netSalary: net\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "d1f7b036-7c9c-4613-8d09-b47209772d1c",
+      "name": "Calculate Net Pay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "generate",
+        "documentName": "Payslip",
+        "text": "=Name: {{ $json.name }}\nNet Pay: ${{ $json.netSalary }}\nTax Deduction: ${{ $json.tax }}\nPeriod: Current Month"
+      },
+      "id": "e1f7b036-7c9c-4613-8d09-b47209772d1d",
+      "name": "Generate HTML Payslip",
+      "type": "n8n-nodes-base.pdfKit",
+      "typeVersion": 1,
+      "position": [
+        850,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Your Monthly Payslip - IntelliHR",
+        "message": "Dear employee, your payslip is attached.",
+        "attachments": "Payslip"
+      },
+      "id": "f1f7b036-7c9c-4613-8d09-b47209772d1e",
+      "name": "Gmail Payslip Dispatch",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Employees": {
+      "main": [
+        [
+          {
+            "node": "Calculate Net Pay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Net Pay": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Payslip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Payslip": {
+      "main": [
+        [
+          {
+            "node": "Gmail Payslip Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}
