@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   CalendarDays, 
   Send, 
-  CheckSquare, 
   HelpCircle,
-  FileText,
   AlertCircle
 } from 'lucide-react';
 import { api } from '../services/api';

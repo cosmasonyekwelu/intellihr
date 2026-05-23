@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Plus, 
   Search, 
   Trash2, 
   Edit3, 
@@ -30,7 +29,8 @@ export const Employees: React.FC = () => {
     department: '',
     salary: 3000,
     status: 'active',
-    performanceRating: 3
+    performanceRating: 3,
+    photo: null as File | null
   });
 
   const fetchEmployees = async () => {
@@ -52,10 +52,23 @@ export const Employees: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('email', formData.email);
+      data.append('phone', formData.phone);
+      data.append('position', formData.position);
+      data.append('department', formData.department);
+      data.append('salary', formData.salary.toString());
+      data.append('status', formData.status);
+      data.append('performanceRating', formData.performanceRating.toString());
+      if (formData.photo) {
+        data.append('photo', formData.photo);
+      }
+
       if (modalMode === 'create') {
-        await api.employees.create(formData);
+        await api.employees.create(data);
       } else {
-        await api.employees.update(selectedId, formData);
+        await api.employees.update(selectedId, data);
       }
       setShowModal(false);
       fetchEmployees();
@@ -67,7 +80,8 @@ export const Employees: React.FC = () => {
         department: '',
         salary: 3000,
         status: 'active',
-        performanceRating: 3
+        performanceRating: 3,
+        photo: null
       });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Error processing request');
@@ -84,7 +98,8 @@ export const Employees: React.FC = () => {
       department: emp.department,
       salary: emp.salary,
       status: emp.status,
-      performanceRating: emp.performanceRating || 3
+      performanceRating: emp.performanceRating || 3,
+      photo: null
     });
     setModalMode('edit');
     setShowModal(true);
@@ -122,7 +137,8 @@ export const Employees: React.FC = () => {
               department: '',
               salary: 3000,
               status: 'active',
-              performanceRating: 3
+              performanceRating: 3,
+              photo: null
             });
             setModalMode('create');
             setShowModal(true);
@@ -192,6 +208,7 @@ export const Employees: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
+                  <th className="pb-3 font-semibold">Photo</th>
                   <th className="pb-3 font-semibold">Employee</th>
                   <th className="pb-3 font-semibold">Department</th>
                   <th className="pb-3 font-semibold">Salary (Mo)</th>
@@ -203,6 +220,15 @@ export const Employees: React.FC = () => {
               <tbody className="divide-y divide-slate-800/50">
                 {employees.map((emp) => (
                   <tr key={emp._id} className="hover:bg-slate-950/20 group transition-colors">
+                    <td className="py-4">
+                      {emp.photoUrl ? (
+                        <img src={emp.photoUrl} alt={emp.name} className="w-10 h-10 rounded-full object-cover border border-slate-700" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 font-bold">
+                          {emp.name.charAt(0)}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-4">
                       <div className="font-bold text-slate-200">{emp.name}</div>
                       <div className="text-[10px] text-slate-500 mt-0.5">{emp.position} • {emp.email}</div>
@@ -273,6 +299,16 @@ export const Employees: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employee Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setFormData({ ...formData, photo: e.target.files?.[0] || null })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:border-indigo-500 focus:outline-none file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
+                  />
+                </div>
+
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</label>
                   <input

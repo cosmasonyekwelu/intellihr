@@ -52,12 +52,16 @@ export const api = {
       const response = await apiClient.get(`/employees/${id}`);
       return response.data;
     },
-    create: async (data: any) => {
-      const response = await apiClient.post('/employees', data);
+    create: async (formData: FormData) => {
+      const response = await apiClient.post('/employees', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       return response.data;
     },
-    update: async (id: string, data: any) => {
-      const response = await apiClient.put(`/employees/${id}`, data);
+    update: async (id: string, formData: FormData) => {
+      const response = await apiClient.put(`/employees/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       return response.data;
     },
     delete: async (id: string) => {
