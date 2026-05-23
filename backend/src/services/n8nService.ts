@@ -11,12 +11,12 @@ export class N8nService {
   /**
    * Calls n8n monthly payroll webhook
    */
-  static async triggerPayroll(month: number, year: number): Promise<any> {
+  static async triggerPayroll(month: number, year: number, companyId: string, records: any[] = []): Promise<any> {
     const url = process.env.N8N_PAYROLL_WEBHOOK_URL || 'http://localhost:5678/webhook/payroll';
     console.log(`[n8n Service] Triggering Payroll workflow: POST ${url} with month=${month}, year=${year}`);
     
     try {
-      const response = await axios.post(url, { month, year }, { headers: this.getHeaders() });
+      const response = await axios.post(url, { month, year, companyId, records }, { headers: this.getHeaders() });
       console.log(`[n8n Service] Webhook response code: ${response.status}`);
       return response.data;
     } catch (error: any) {
@@ -54,6 +54,38 @@ export class N8nService {
       return response.data;
     } catch (error: any) {
       console.error(`[n8n Service] Error calling leave email digest webhook:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Trigger password reset email workflow without blocking the auth response.
+   */
+  static async triggerPasswordReset(payload: { email: string; name?: string; resetToken: string; resetUrl: string }): Promise<any> {
+    const url = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL || 'http://localhost:5678/webhook/password-reset';
+    console.log(`[n8n Service] Triggering Password Reset workflow: POST ${url}`);
+
+    try {
+      const response = await axios.post(url, payload, { headers: this.getHeaders() });
+      return response.data;
+    } catch (error: any) {
+      console.error(`[n8n Service] Error calling password reset webhook:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Trigger employee invitation email workflow.
+   */
+  static async triggerEmployeeInvitation(payload: { email: string; name: string; company: string; inviteUrl: string }): Promise<any> {
+    const url = process.env.N8N_EMPLOYEE_INVITE_WEBHOOK_URL || 'http://localhost:5678/webhook/employee-invitation';
+    console.log(`[n8n Service] Triggering Employee Invitation workflow: POST ${url}`);
+
+    try {
+      const response = await axios.post(url, payload, { headers: this.getHeaders() });
+      return response.data;
+    } catch (error: any) {
+      console.error(`[n8n Service] Error calling employee invitation webhook:`, error.message);
       return { success: false, error: error.message };
     }
   }

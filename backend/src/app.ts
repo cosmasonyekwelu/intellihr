@@ -11,6 +11,8 @@ import attendanceRoutes from './routes/attendanceRoutes';
 import leaveRoutes from './routes/leaveRoutes';
 import payrollRoutes from './routes/payrollRoutes';
 import aiRoutes from './routes/aiRoutes';
+import leaveTypeRoutes from './routes/leaveTypeRoutes';
+import profileRoutes from './routes/profileRoutes';
 
 // Load variables
 dotenv.config();
@@ -33,7 +35,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leave', leaveRoutes);
+app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Root Endpoint

@@ -3,6 +3,7 @@ import { Schema, model } from 'mongoose';
 const payrollSchema = new Schema(
   {
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
+    companyId: { type: String, required: true, index: true },
     month: { type: Number, required: true, min: 1, max: 12 },
     year: { type: Number, required: true },
     grossSalary: { type: Number, required: true },

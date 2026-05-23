@@ -6,48 +6,63 @@ import {
   Clock, 
   CalendarDays, 
   CircleDollarSign, 
-  LogOut 
+  LogOut,
+  X,
+  SlidersHorizontal,
+  UserRound
 } from 'lucide-react';
+import { clearSession, getCurrentUser } from '../services/auth';
+import { Avatar } from './ui/Avatar';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
   const navigate = useNavigate();
-  const userString = localStorage.getItem('intellihr_user');
-  const user = userString ? JSON.parse(userString) : null;
-  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+  const user = getCurrentUser();
+  const isHR = user?.role === 'hr';
 
   const handleLogout = () => {
-    localStorage.removeItem('intellihr_token');
-    localStorage.removeItem('intellihr_user');
+    clearSession();
     navigate('/login');
   };
 
   const navItems = [
-    { name: 'Dashboard', to: '/', icon: LayoutDashboard, show: true },
-    { name: 'Employees', to: '/employees', icon: Users, show: isAdminOrHR },
+    { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, show: true },
+    { name: 'Employees', to: '/employees', icon: Users, show: isHR },
     { name: 'Attendance', to: '/attendance', icon: Clock, show: true },
     { name: 'Leave Requests', to: '/leaves', icon: CalendarDays, show: true },
+    { name: 'Leave Types', to: '/leave-types', icon: SlidersHorizontal, show: isHR },
     { name: 'Payroll', to: '/payroll', icon: CircleDollarSign, show: true },
+    { name: 'Profile', to: '/profile', icon: UserRound, show: true },
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-20">
+    <>
+      {open && <button type="button" aria-label="Close navigation overlay" className="fixed inset-0 z-30 bg-slate-950/40 backdrop-blur-sm lg:hidden" onClick={onClose} />}
+      <aside className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r border-slate-200 bg-white shadow-xl shadow-slate-900/10 transition-transform duration-300 lg:translate-x-0 lg:shadow-none ${open ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Brand Section */}
-      <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+      <div className="flex items-center gap-3 border-b border-slate-200 p-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white shadow-sm shadow-indigo-500/30">
           iH
         </div>
-        <div>
-          <h1 className="font-extrabold text-lg leading-none bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-extrabold leading-none text-slate-950">
             IntelliHR
           </h1>
-          <span className="text-[10px] text-slate-500 font-semibold tracking-widest uppercase">
-            AI Automation
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            People operations
           </span>
         </div>
+        <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden">
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
         {navItems
           .filter((item) => item.show)
           .map((item) => {
@@ -56,15 +71,16 @@ export const Sidebar: React.FC = () => {
               <NavLink
                 key={item.name}
                 to={item.to}
+                onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-sm font-medium ${
+                  `group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold transition-all duration-200 ${
                     isActive
-                      ? 'bg-indigo-600/10 text-indigo-400 border-l-4 border-indigo-500'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
                   }`
                 }
               >
-                <Icon className="w-5 h-5 transition-transform group-hover:scale-105" />
+                <Icon className="h-5 w-5 transition-transform group-hover:scale-105" />
                 {item.name}
               </NavLink>
             );
@@ -72,15 +88,13 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Footer User Info */}
-      <div className="p-4 border-t border-slate-800 bg-slate-950/40">
-        <div className="flex items-center gap-3 mb-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
-            {user?.name?.substring(0, 2).toUpperCase() || 'US'}
-          </div>
-          <div className="overflow-hidden">
-            <h4 className="text-xs font-bold text-slate-200 truncate">{user?.name || 'User'}</h4>
-            <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-widest block truncate">
-              {user?.role || 'employee'}
+      <div className="border-t border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3 flex items-center gap-3 rounded-lg bg-white p-3 shadow-sm">
+          <Avatar name={user?.name} size="sm" />
+          <div className="min-w-0">
+            <h4 className="truncate text-sm font-semibold text-slate-950">{user?.name || 'User'}</h4>
+            <span className="block truncate text-xs font-semibold capitalize text-slate-500">
+              {(user?.role || 'employee').replace('_', ' ')}
             </span>
           </div>
         </div>
@@ -88,12 +102,13 @@ export const Sidebar: React.FC = () => {
         <button
           onClick={handleLogout}
           id="btn_logout"
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors border border-dashed border-red-500/20"
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="h-4 w-4" />
           Sign Out
         </button>
       </div>
     </aside>
+    </>
   );
 };

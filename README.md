@@ -1,118 +1,202 @@
-# IntelliHR: AI-Powered HR & Payroll Automation Platform
+# IntelliHR
 
-IntelliHR is a SaaS platform designed to automate HR administrative duties, attendance logging, monthly payroll computations, and employee leave requests. Integrated with **OpenAI GPT-4o-mini** and **n8n Orchestration**, the platform features a highly conversational AI Agent (RAG) that lets managers and employees query logs using natural language.
+IntelliHR is a multi-tenant HR and payroll SaaS platform built with React, TypeScript, Tailwind CSS, Node.js, Express, MongoDB, Mongoose, n8n, and OpenAI.
 
----
+Each company is created by an HR Manager during signup. All business data is scoped by `companyId`, which is issued in the JWT and applied to backend queries for employees, attendance, leave, payroll, profiles, and AI conversations.
 
-## 🚀 Key Features
+## Tenant Rules
 
-1. **User Authentication & Roles**: JWT-secured login dashboards for Admins, HR Managers, and standard Employees.
-2. **Employee CRUD Directory**: Manage active/terminated/on-leave profiles with integrated Slack hiring alerts.
-3. **Clock-In / Out Station**: Geolocation-aware clocking nodes that auto-compute lateness status based on a 9:00 AM standard threshold.
-4. **Absence Approvals Queue**: Submit leave requests with automatic Employee status modifications upon approval.
-5. **Deductions & Payroll Automation**: Runs monthly aggregates (gross pay, tax, pension, bonuses) through local engines or n8n hooks, outputting dynamic PDF payslips.
-6. **Intercom-style AI Agent Widget**: Answers natural language questions, queries database parameters via OpenAI Function calling, and charts variance data.
+- Only two roles exist: `hr` and `employee`.
+- There is no admin role.
+- There is no seed data and no default user.
+- Employees cannot sign up directly.
+- HR Managers create companies through `/signup`.
+- Employees join only from HR-generated invitation links.
+- Every tenant-owned query must include `companyId` from the authenticated user.
+- Employees can only access their own attendance, leave, payroll, and profile data.
 
----
+## Stack
 
-## 🛠️ Tech Stack
+- Frontend: React, TypeScript, Vite, Tailwind CSS, Recharts, Lucide React
+- Backend: Node.js, TypeScript, Express
+- Database: MongoDB and Mongoose
+- Automation: n8n workflow templates
+- AI: OpenAI API
 
-* **Frontend**: React (TypeScript), Tailwind CSS, Vite, Axios, React Router, Lucide Icons
-* **Backend**: Node.js (TypeScript), Express, Mongoose, PDFKit, OpenAI SDK
-* **Database**: MongoDB (Mongoose)
-* **Automation**: n8n Workflow Orchestrator
-* **AI Model**: GPT-4o-mini (Function Calling / Tool calls)
+## Project Structure
 
----
-
-## 📦 Getting Started
-
-### 1. Initialize Infrastructure (Docker)
-Ensure Docker is running, then boot up the self-hosted n8n and MongoDB containers from the root project directory:
-```bash
-docker-compose up -d
+```text
+backend/   Express API, models, controllers, routes, services
+frontend/  React app, pages, layout, reusable UI components
+n8n/       Importable workflow JSON templates
 ```
-* **MongoDB** runs on: `mongodb://localhost:27017`
-* **n8n Engine** runs on: `http://localhost:5678`
 
----
+## Environment
 
-### 2. Configure Environment Variables
-Inside `backend/` create a `.env` file based on `.env.example`:
+Create `backend/.env` from `backend/.env.example`.
+
 ```env
 PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/intellihr
-JWT_SECRET=intellihr_default_jwt_secret_key_12345
+JWT_SECRET=replace_with_a_strong_jwt_secret
 OPENAI_API_KEY=your_openai_api_key_here
+FRONTEND_URL=http://localhost:3000
 
-# n8n webhook integration endpoints
-N8N_API_KEY=intellihr_static_n8n_api_key_secure_123
+N8N_API_KEY=replace_with_your_n8n_api_key
+N8N_WEBHOOK_BASE_URL=http://localhost:5678/webhook
 N8N_PAYROLL_WEBHOOK_URL=http://localhost:5678/webhook/payroll
-N8N_SLACK_WEBHOOK_URL=http://localhost:5678/webhook/slack-alerts
+N8N_EMPLOYEE_INVITE_WEBHOOK_URL=http://localhost:5678/webhook/employee-invitation
+N8N_PASSWORD_RESET_WEBHOOK_URL=http://localhost:5678/webhook/password-reset
+N8N_ATTENDANCE_REMINDER_WEBHOOK_URL=http://localhost:5678/webhook/attendance-reminder
 N8N_EMAIL_DIGEST_WEBHOOK_URL=http://localhost:5678/webhook/email-digest
+
+GMAIL_USER=
+GMAIL_PASS=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=
+SLACK_INCOMING_WEBHOOK_URL=
 ```
-*(If `OPENAI_API_KEY` is omitted, the AI Assistant will dynamically fall back to a rich Local Sandbox Mock Engine so you can still test conversational flows).*
 
----
+## Run Locally
 
-### 3. Install & Seed Backend
-From the `backend/` directory:
+Start MongoDB and n8n:
+
 ```bash
-# Install dependencies
+docker-compose up -d
+```
+
+Install and run the backend:
+
+```bash
+cd backend
 npm install
-
-# Seed demo directory (Users, Attendance logs, Leaves)
-npm run seed
-
-# Boot up Node Development Server
 npm run dev
 ```
 
----
+Install and run the frontend:
 
-### 4. Install & Run Frontend
-From the `frontend/` directory:
 ```bash
-# Install dependencies
+cd frontend
 npm install
-
-# Start Vite server
 npm run dev
 ```
-Open **`http://localhost:3000`** in your browser to view the console.
 
----
+Open `http://localhost:3000`.
 
-## 🔑 Demo Seed Accounts
+## Fresh Database
 
-| Role | Username | Password | Purpose |
-|------|----------|----------|---------|
-| **HR Manager** | `hr@intellihr.com` | `password123` | Approves leave, executes payroll, full CRUD |
-| **Employee** | `employee@intellihr.com` | `password123` | Clocks in/out, requests leave, chats with AI |
-| **Admin** | `admin@intellihr.com` | `password123` | Full backend management permissions |
+This project intentionally ships without seed scripts. To start from an empty local database, drop the `intellihr` database directly in MongoDB before signing up the first HR Manager.
 
----
+Example:
 
-## 🤖 AI Conversation Queries to Try
+```bash
+mongosh mongodb://127.0.0.1:27017/intellihr --eval "db.dropDatabase()"
+```
 
-Open the floating bubble on the bottom right and test these:
-* *“Why was payroll higher this month?”* (Compares monthly variances, bonuses, and tax deductions)
-* *“Summarize attendance issues for this month”* (Queries Attendance collection for late check-ins and absences)
-* *“Which employees are underperforming?”* (Extracts database profiles with rating <= 2)
-* *“Generate HR report for management”* (Compiles a digest on active employees, total historical spend, and present-to-absent percentages)
+After that, create the first company through `/signup`.
 
----
+## First Use Flow
 
-## 🔄 n8n Integration & Webhook Imports
+1. Visit `/signup`.
+2. Create an HR Manager account with a company name.
+3. The backend creates a `Company` and an HR `User` with the same `companyId`.
+4. The HR Manager is logged in automatically.
+5. Go to Employees and invite employees by email.
+6. Employees register through `/register/employee?token=...`.
+7. Employee accounts are created with role `employee` and the same `companyId`.
 
-We have provided complete JSON templates inside `n8n/` to configure n8n in seconds:
-1. Navigate to **`http://localhost:5678`** in your browser.
-2. Create a new workflow, click the top right settings wheel -> **Import from File**.
-3. Choose a template:
-   * **`payroll-workflow.json`**: Scheduled calculations, PDF compilation, and emails.
-   * **`whatsapp-agent-workflow.json`**: Connects Twilio SMS sandboxes to OpenAI agents.
-   * **`slack-alerts-workflow.json`**: Posts instant hiring notifications to a Slack channel.
-   * **`email-digest-workflow.json`**: Sends pending HR leave summaries to email leads.
-4. **Secure Webhooks**: To protect endpoints from external queries, all HTTP headers are configured with:
-   * Header Key: `X-API-Key`
-   * Header Value: `intellihr_static_n8n_api_key_secure_123` (Set in `.env`)
+## Authentication Routes
+
+- `POST /api/auth/signup` creates a company and HR user.
+- `POST /api/auth/login` returns a JWT containing `userId`, `companyId`, and `role`.
+- `POST /api/auth/forgot-password` creates a reset token and triggers n8n email delivery.
+- `POST /api/auth/reset-password` updates the password from a reset token.
+- `POST /api/auth/change-password` changes the current user's password.
+- `GET /api/auth/me` returns the authenticated user.
+
+## Employee Routes
+
+- `GET /api/employees` returns all company employees for HR, or the employee's own record.
+- `POST /api/employees/invite` invites an employee. HR only.
+- `GET /api/employees/invite/verify?token=...` validates an invitation token.
+- `POST /api/employees/register` activates an invited employee.
+- `PUT /api/employees/:id` updates a company employee. HR only.
+- `DELETE /api/employees/:id` soft-deletes a company employee. HR only.
+- `POST /api/employees/:id/promote` records a promotion. HR only.
+- `POST /api/employees/:id/transfer` records a department transfer. HR only.
+- `POST /api/employees/:id/warning` records a warning. HR only.
+- `POST /api/employees/:id/suspend` records a suspension. HR only.
+- `POST /api/employees/:id/terminate` terminates employment. HR only.
+- `POST /api/employees/resign` submits a resignation request. Employee only.
+
+## Leave, Attendance, Payroll, Profile
+
+- Leave types: `GET`, `POST`, `PUT`, `DELETE /api/leave-types`. HR only.
+- Leave requests: `/api/leave/request`, `/api/leave/my-requests`, `/api/leave/pending`, `/api/leave/:id/approve`, `/api/leave/:id/reject`.
+- Attendance: `/api/attendance/checkin`, `/api/attendance/checkout`, `/api/attendance/report`.
+- Payroll: `GET /api/payroll`, `POST /api/payroll/run`.
+- Profile: `GET /api/profile`, `PUT /api/profile`, `POST /api/profile/change-password`.
+
+## Frontend Routes
+
+Public:
+
+- `/`
+- `/login`
+- `/signup`
+- `/forgot-password`
+- `/reset-password`
+- `/register/employee`
+
+Protected:
+
+- `/dashboard`
+- `/employees` HR only
+- `/attendance`
+- `/leaves`
+- `/leave-types` HR only
+- `/payroll`
+- `/profile`
+
+## n8n Workflows
+
+Import workflow templates from `n8n/`:
+
+- `employee-invitation-workflow.json`
+- `password-reset-workflow.json`
+- `payroll-workflow.json`
+- `attendance-reminder-workflow.json`
+- `email-digest-workflow.json`
+- `slack-alerts-workflow.json`
+- `whatsapp-agent-workflow.json`
+
+The payroll and digest workflows expect tenant-scoped payloads from the backend. Do not configure n8n workflows to fetch global employee or leave data.
+
+## Build
+
+Backend:
+
+```bash
+cd backend
+npm run build
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+## Testing Notes
+
+The TypeScript builds are the primary verification path currently. The backend test script expects Jest from `backend/node_modules`; run `npm install` in `backend/` before `npm test`.
+
+## Security Notes
+
+- Use a strong `JWT_SECRET` in every environment.
+- Keep `OPENAI_API_KEY` and n8n credentials out of source control.
+- Do not add seed users or shared demo accounts.
+- Do not introduce an `admin` role.
+- Keep all tenant-owned database reads and writes scoped by `companyId`.

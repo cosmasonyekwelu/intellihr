@@ -12,7 +12,7 @@ export class AiController {
       }
 
       console.log(`[AI Controller] Query received: "${question}"`);
-      const answer = await AiService.askQuestion(question);
+      const answer = await AiService.askQuestion(question, req.user?.companyId || '');
 
       res.json({ answer });
     } catch (error: any) {

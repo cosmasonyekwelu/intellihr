@@ -1,0 +1,91 @@
+{
+  "name": "IntelliHR Attendance Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "attendance-reminder-schedule",
+      "name": "Daily 6pm Reminder",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.INTELLIHR_API_URL || 'http://localhost:5000'}}/api/attendance/report",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "month",
+              "value": "={{new Date().getMonth() + 1}}"
+            },
+            {
+              "name": "year",
+              "value": "={{new Date().getFullYear()}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.INTELLIHR_SERVICE_TOKEN}}"
+            }
+          ]
+        }
+      },
+      "id": "fetch-attendance",
+      "name": "Fetch Attendance Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\":true,\"message\":\"Attendance reminder workflow template executed\"}"
+      },
+      "id": "attendance-reminder-response",
+      "name": "Reminder Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Daily 6pm Reminder": {
+      "main": [
+        [
+          {
+            "node": "Fetch Attendance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Attendance Report": {
+      "main": [
+        [
+          {
+            "node": "Reminder Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

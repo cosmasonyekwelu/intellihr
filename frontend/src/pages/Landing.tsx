@@ -57,7 +57,7 @@ export const Landing: React.FC = () => {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <button className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white font-bold transition-all flex items-center justify-center gap-2">
-              Watch Demo
+              View Workflow
             </button>
           </div>
         </div>
@@ -114,7 +114,7 @@ export const Landing: React.FC = () => {
           <div className="p-12 rounded-[40px] bg-gradient-to-br from-indigo-600 to-indigo-800 text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[80px] rounded-full" />
             <h2 className="text-4xl font-black text-white mb-6 tracking-tight">Ready to modernize your company?</h2>
-            <p className="text-indigo-100 mb-10 text-lg opacity-90">Join 500+ teams using IntelliHR to save 20+ hours on administrative tasks every week.</p>
+            <p className="text-indigo-100 mb-10 text-lg opacity-90">Join 500+ teams using IntelliHR to save 20+ hours on people-operations tasks every week.</p>
             <Link to="/login" className="inline-flex items-center gap-2 px-10 py-4 rounded-2xl bg-white text-indigo-600 font-bold hover:bg-slate-100 transition-all shadow-xl">
               Get Access Now
               <ArrowRight className="w-5 h-5" />
@@ -131,7 +131,7 @@ export const Landing: React.FC = () => {
             <span className="text-sm font-bold tracking-tighter text-white uppercase italic">IntelliHR Platform</span>
           </div>
           <p className="text-slate-600 text-xs font-medium">
-            © 2026 IntelliHR Automation. All rights reserved. Built with OpenAI & n8n.
+            Copyright 2026 IntelliHR Automation. All rights reserved. Built with OpenAI and n8n.
           </p>
         </div>
       </footer>

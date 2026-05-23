@@ -1,66 +1,98 @@
 import { Response } from 'express';
 import { LeaveRequest } from '../models/LeaveRequest';
+import { LeaveType } from '../models/LeaveType';
 import { Employee } from '../models/Employee';
 import { AuthenticatedRequest } from '../middleware/auth';
+
+const countDays = (startDate: Date, endDate: Date) => {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  return Math.max(1, Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1);
+};
 
 export class LeaveController {
   static async submitRequest(req: AuthenticatedRequest, res: Response) {
     try {
+      const companyId = req.user?.companyId;
       const employeeId = req.user?.employeeId;
-      if (!employeeId) {
-        return res.status(400).json({ message: 'User is not linked to any Employee file.' });
+      if (!companyId || !employeeId) return res.status(400).json({ message: 'Employee profile is required.' });
+
+      const { leaveTypeId, startDate, endDate, reason } = req.body;
+      if (!leaveTypeId || !startDate || !endDate || !reason) {
+        return res.status(400).json({ message: 'Leave type, dates, and reason are required.' });
       }
 
-      const { type, startDate, endDate, reason } = req.body;
+      const leaveType = await LeaveType.findOne({ _id: leaveTypeId, companyId });
+      if (!leaveType) return res.status(404).json({ message: 'Leave type not found.' });
 
-      if (!type || !startDate || !endDate || !reason) {
-        return res.status(400).json({ message: 'All request fields are required.' });
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end < start) return res.status(400).json({ message: 'End date cannot be before start date.' });
+
+      if (leaveType.allowedDays >= 0) {
+        const yearStart = new Date(start.getFullYear(), 0, 1);
+        const yearEnd = new Date(start.getFullYear(), 11, 31, 23, 59, 59);
+        const approved = await LeaveRequest.find({
+          companyId,
+          employeeId,
+          leaveTypeId,
+          status: 'approved',
+          startDate: { $gte: yearStart, $lte: yearEnd }
+        });
+        const usedDays = approved.reduce((total, request) => total + countDays(request.startDate, request.endDate), 0);
+        const requestedDays = countDays(start, end);
+
+        if (usedDays + requestedDays > leaveType.allowedDays) {
+          return res.status(400).json({
+            message: `Insufficient ${leaveType.name} balance. Remaining days: ${Math.max(0, leaveType.allowedDays - usedDays)}`
+          });
+        }
       }
 
       const request = await LeaveRequest.create({
+        companyId,
         employeeId,
-        type,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        leaveTypeId,
+        startDate: start,
+        endDate: end,
         reason,
-        status: 'pending'
+        status: leaveType.requiresApproval ? 'pending' : 'approved',
+        approvedBy: leaveType.requiresApproval ? null : req.user?.id
       });
 
-      res.status(201).json({
-        message: 'Leave request submitted successfully',
-        request
-      });
+      res.status(201).json({ message: 'Leave request submitted successfully', request });
     } catch (error: any) {
       res.status(500).json({ message: 'Error submitting request', error: error.message });
     }
   }
 
+  static async approve(req: AuthenticatedRequest, res: Response) {
+    return LeaveController.setStatus(req, res, 'approved');
+  }
+
+  static async reject(req: AuthenticatedRequest, res: Response) {
+    return LeaveController.setStatus(req, res, 'rejected');
+  }
+
   static async updateStatus(req: AuthenticatedRequest, res: Response) {
+    const status = req.body.status;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Valid status is required.' });
+    }
+    return LeaveController.setStatus(req, res, status);
+  }
+
+  private static async setStatus(req: AuthenticatedRequest, res: Response, status: 'approved' | 'rejected') {
     try {
-      const { id } = req.params;
-      const { status } = req.body; // 'approved' | 'rejected'
-
-      if (!status || !['approved', 'rejected'].includes(status)) {
-        return res.status(400).json({ message: 'Valid status (approved/rejected) is required.' });
-      }
-
-      const request = await LeaveRequest.findById(id);
-      if (!request) {
-        return res.status(404).json({ message: 'Leave request not found.' });
-      }
+      const request = await LeaveRequest.findOne({ _id: req.params.id, companyId: req.user?.companyId });
+      if (!request) return res.status(404).json({ message: 'Leave request not found.' });
 
       request.status = status;
+      request.approvedBy = req.user?.id as any;
       await request.save();
 
-      // If approved, dynamically update employee status to 'on_leave'
-      if (status === 'approved') {
-        await Employee.findByIdAndUpdate(request.employeeId, { status: 'on_leave' });
-      }
-
-      res.json({
-        message: `Leave request ${status} successfully.`,
-        request
-      });
+      res.json({ message: `Leave request ${status} successfully.`, request });
     } catch (error: any) {
       res.status(500).json({ message: 'Error updating leave request', error: error.message });
     }
@@ -69,26 +101,30 @@ export class LeaveController {
   static async getRequests(req: AuthenticatedRequest, res: Response) {
     try {
       const { status, employeeId } = req.query;
+      const query: any = { companyId: req.user?.companyId };
 
-      const query: any = {};
-
-      if (status) {
-        query.status = status;
-      }
-
-      if (req.user && req.user.role === 'employee') {
-        query.employeeId = req.user.employeeId;
-      } else if (employeeId) {
-        query.employeeId = employeeId;
-      }
+      if (status) query.status = status;
+      if (req.user?.role === 'employee') query.employeeId = req.user.employeeId;
+      else if (employeeId) query.employeeId = employeeId;
 
       const requests = await LeaveRequest.find(query)
         .populate('employeeId', 'name position department status')
+        .populate('leaveTypeId', 'name allowedDays')
         .sort({ createdAt: -1 });
 
       res.json({ requests });
     } catch (error: any) {
       res.status(500).json({ message: 'Error fetching requests', error: error.message });
     }
+  }
+
+  static async myRequests(req: AuthenticatedRequest, res: Response) {
+    req.query.employeeId = req.user?.employeeId || '';
+    return LeaveController.getRequests(req, res);
+  }
+
+  static async pending(req: AuthenticatedRequest, res: Response) {
+    req.query.status = 'pending';
+    return LeaveController.getRequests(req, res);
   }
 }

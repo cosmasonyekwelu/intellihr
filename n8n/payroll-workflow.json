@@ -1,26 +1,6 @@
 {
-  "name": "IntelliHR Monthly Payroll Cycle Processing",
+  "name": "IntelliHR Tenant Payroll Processing",
   "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "months",
-              "value": 1
-            }
-          ]
-        }
-      },
-      "id": "c1f7b036-7c9c-4613-8d09-b47209772d1f",
-      "name": "Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        250,
-        300
-      ]
-    },
     {
       "parameters": {
         "httpMethod": "POST",
@@ -28,123 +8,87 @@
         "options": {}
       },
       "id": "e2f7b036-7c9c-4613-8d09-b47209772d1a",
-      "name": "Webhook Manual Trigger",
+      "name": "Backend Payroll Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
         250,
-        450
+        360
       ]
     },
     {
       "parameters": {
-        "url": "http://localhost:5000/api/employees",
-        "options": {}
-      },
-      "id": "b1f7b036-7c9c-4613-8d09-b47209772d1b",
-      "name": "Fetch Employees",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [
-        450,
-        380
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const results = [];\nconst employees = items[0].json.employees;\nfor (const emp of employees) {\n  const gross = emp.salary;\n  const tax = Math.round(gross * 0.12);\n  const pension = Math.round(gross * 0.08);\n  const loan = 0;\n  const bonus = emp.performanceRating >= 4 ? 500 : 0;\n  const net = gross - (tax + pension + loan) + bonus;\n  results.push({\n    json: {\n      employeeId: emp._id,\n      name: emp.name,\n      email: emp.email,\n      phone: emp.phone,\n      grossSalary: gross,\n      tax,\n      pension,\n      loan,\n      bonus,\n      netSalary: net\n    }\n  });\n}\nreturn results;"
+        "jsCode": "const body = items[0].json.body || items[0].json;\nconst companyId = body.companyId;\nconst month = body.month;\nconst year = body.year;\nconst records = body.records || [];\nif (!companyId) {\n  throw new Error('companyId is required for tenant-isolated payroll processing');\n}\nreturn records.map((record) => ({\n  json: {\n    companyId,\n    month,\n    year,\n    employeeId: record.employeeId,\n    name: record.name,\n    email: record.email,\n    grossSalary: record.grossSalary,\n    deductions: record.deductions || {},\n    bonuses: record.bonuses || 0,\n    netSalary: record.netSalary\n  }\n}));"
       },
       "id": "d1f7b036-7c9c-4613-8d09-b47209772d1c",
-      "name": "Calculate Net Pay",
+      "name": "Use Company-Scoped Payroll Records",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        650,
-        380
+        500,
+        360
       ]
     },
     {
       "parameters": {
         "operation": "generate",
         "documentName": "Payslip",
-        "text": "=Name: {{ $json.name }}\nNet Pay: ${{ $json.netSalary }}\nTax Deduction: ${{ $json.tax }}\nPeriod: Current Month"
+        "text": "=Company: {{ $json.companyId }}\nName: {{ $json.name }}\nPeriod: {{ $json.month }}/{{ $json.year }}\nGross Pay: {{ $json.grossSalary }}\nBonuses: {{ $json.bonuses }}\nNet Pay: {{ $json.netSalary }}"
       },
       "id": "e1f7b036-7c9c-4613-8d09-b47209772d1d",
-      "name": "Generate HTML Payslip",
+      "name": "Generate Payslip PDF",
       "type": "n8n-nodes-base.pdfKit",
       "typeVersion": 1,
       "position": [
-        850,
-        380
+        750,
+        360
       ]
     },
     {
       "parameters": {
         "sendTo": "={{ $json.email }}",
-        "subject": "Your Monthly Payslip - IntelliHR",
-        "message": "Dear employee, your payslip is attached.",
+        "subject": "Your monthly payslip",
+        "message": "Hello {{ $json.name }}, your payslip is attached.",
         "attachments": "Payslip"
       },
       "id": "f1f7b036-7c9c-4613-8d09-b47209772d1e",
-      "name": "Gmail Payslip Dispatch",
+      "name": "Send Payslip Email",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
       "position": [
-        1050,
-        380
+        1000,
+        360
       ]
     }
   ],
   "connections": {
-    "Schedule Trigger": {
+    "Backend Payroll Webhook": {
       "main": [
         [
           {
-            "node": "Fetch Employees",
+            "node": "Use Company-Scoped Payroll Records",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook Manual Trigger": {
+    "Use Company-Scoped Payroll Records": {
       "main": [
         [
           {
-            "node": "Fetch Employees",
+            "node": "Generate Payslip PDF",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Employees": {
+    "Generate Payslip PDF": {
       "main": [
         [
           {
-            "node": "Calculate Net Pay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Calculate Net Pay": {
-      "main": [
-        [
-          {
-            "node": "Generate HTML Payslip",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate HTML Payslip": {
-      "main": [
-        [
-          {
-            "node": "Gmail Payslip Dispatch",
+            "node": "Send Payslip Email",
             "type": "main",
             "index": 0
           }

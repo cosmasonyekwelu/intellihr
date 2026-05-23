@@ -1,121 +1,111 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Sidebar } from './components/Sidebar';
-import { Header } from './components/Header';
-import { AIWidget } from './components/AIWidget';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PrivateRoute } from './components/PrivateRoute';
+import { DashboardLayout } from './layouts/DashboardLayout';
+import { ToastProvider } from './components/ui/Toast';
 
 // Page Imports
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
+import { ResetPassword } from './pages/ResetPassword';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { EmployeeRegister } from './pages/EmployeeRegister';
 import { Dashboard } from './pages/Dashboard';
 import { Employees } from './pages/Employees';
 import { Attendance } from './pages/Attendance';
 import { LeaveRequests } from './pages/LeaveRequests';
 import { Payroll } from './pages/Payroll';
-
-// Layout wrapper component to isolate header title logic dynamically
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const location = useLocation();
-
-  const getPageTitle = (path: string) => {
-    switch (path) {
-      case '/': return 'Dashboard';
-      case '/employees': return 'Employees Registry';
-      case '/attendance': return 'Attendance Logs';
-      case '/leaves': return 'Leave Applications';
-      case '/payroll': return 'Payroll Ledger';
-      default: return 'IntelliHR Operations';
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 font-sans pl-64">
-      {/* Sidebar navigation */}
-      <Sidebar />
-
-      {/* Main console frame */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        <Header title={getPageTitle(location.pathname)} />
-        <main className="flex-1 p-8 overflow-y-auto max-w-[1400px] w-full mx-auto pb-24">
-          {children}
-        </main>
-      </div>
-
-      {/* Floating AI Chat Assistant */}
-      <AIWidget />
-    </div>
-  );
-};
+import { LeaveTypes } from './pages/LeaveTypes';
+import { Profile } from './pages/Profile';
 
 export const App: React.FC = () => {
   return (
-    <Router>
-      <Routes>
-        
-        {/* Public Landing Page */}
-        <Route path="/" element={<Landing />} />
+    <ToastProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/register/employee" element={<EmployeeRegister />} />
 
-        {/* Authentication landing page */}
-        <Route path="/login" element={<Login />} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <DashboardLayout>
+                  <Dashboard />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/employees"
+            element={
+              <PrivateRoute allowedRoles={['hr']}>
+                <DashboardLayout>
+                  <Employees />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/attendance"
+            element={
+              <PrivateRoute>
+                <DashboardLayout>
+                  <Attendance />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/leaves"
+            element={
+              <PrivateRoute>
+                <DashboardLayout>
+                  <LeaveRequests />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/leave-types"
+            element={
+              <PrivateRoute allowedRoles={['hr']}>
+                <DashboardLayout>
+                  <LeaveTypes />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/payroll"
+            element={
+              <PrivateRoute>
+                <DashboardLayout>
+                  <Payroll />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <DashboardLayout>
+                  <Profile />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
 
-        {/* Console protected areas */}
-        <Route 
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/employees" 
-          element={
-            <PrivateRoute allowedRoles={['admin', 'hr_manager']}>
-              <Layout>
-                <Employees />
-              </Layout>
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/attendance" 
-          element={
-            <PrivateRoute>
-              <Layout>
-                <Attendance />
-              </Layout>
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/leaves" 
-          element={
-            <PrivateRoute>
-              <Layout>
-                <LeaveRequests />
-              </Layout>
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/payroll" 
-          element={
-            <PrivateRoute>
-              <Layout>
-                <Payroll />
-              </Layout>
-            </PrivateRoute>
-          } 
-        />
-
-        {/* Session Fallback Redirection */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-
-      </Routes>
-    </Router>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 };
 

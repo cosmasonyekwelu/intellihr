@@ -4,24 +4,17 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import jwt from 'jsonwebtoken';
 import { Employee } from '../models/Employee';
 import employeeRoutes from '../routes/employeeRoutes';
 
 const app = express();
 app.use(express.json());
 
-// Mock auth middleware for testing
-const mockAuth = (req: any, res: any, next: any) => {
-  req.user = { id: 'testuser', role: 'admin' };
-  next();
-};
-
 // We need to bypass the real authenticateJWT and requireRoles
 // In the test we can just use the router but we need to mock the middlewares it uses
 jest.mock('../middleware/auth', () => ({
   authenticateJWT: (req: any, res: any, next: any) => {
-    req.user = { id: 'testuser', role: 'admin' };
+    req.user = { id: 'testuser', role: 'hr', companyId: 'test-company' };
     next();
   },
   requireRoles: (roles: string[]) => (req: any, res: any, next: any) => next()
@@ -46,8 +39,9 @@ describe('Employee Documents & Photo Upload API', () => {
   let employeeId: string;
 
   beforeEach(async () => {
-    await Employee.deleteMany({});
+    await Employee.deleteMany({ companyId: 'test-company' });
     const emp = await Employee.create({
+      companyId: 'test-company',
       name: 'Test Employee',
       email: 'test@example.com',
       phone: '1234567890',

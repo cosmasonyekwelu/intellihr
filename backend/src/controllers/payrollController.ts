@@ -20,6 +20,7 @@ export class PayrollController {
       const targetYear = parseInt(year as string, 10);
 
       const query: any = {
+        companyId: req.user?.companyId,
         month: targetMonth,
         year: targetYear
       };
@@ -48,18 +49,14 @@ export class PayrollController {
 
       console.log(`[Payroll Controller] Manual trigger initiated for ${month}/${year}`);
 
-      // 1. Attempt to invoke the n8n webhook workflow asynchronously
-      const n8nResult = await N8nService.triggerPayroll(month, year);
-
-      // 2. Perform a robust local calculation fallback in the DB so that the dashboard functions
-      // regardless of whether the self-hosted n8n environment is fully running or accessible.
-      const employees = await Employee.find({ status: { $ne: 'terminated' } });
+      const employees = await Employee.find({ companyId: req.user?.companyId, status: 'active' });
       const createdRecords: any[] = [];
 
       for (const employee of employees) {
         // Double-check if payroll already exists for this employee for this period
         const existing = await Payroll.findOne({
           employeeId: employee._id,
+          companyId: req.user?.companyId,
           month,
           year
         });
@@ -131,6 +128,7 @@ export class PayrollController {
 
         const payroll = await Payroll.create({
           employeeId: employee._id,
+          companyId: req.user?.companyId,
           month,
           year,
           grossSalary,
@@ -143,6 +141,26 @@ export class PayrollController {
 
         createdRecords.push(payroll);
       }
+
+      const webhookRecords = createdRecords.map((record: any) => {
+        const employee = employees.find((item: any) => item._id.toString() === record.employeeId.toString());
+        return {
+          employeeId: record.employeeId,
+          name: employee?.name,
+          email: employee?.email,
+          grossSalary: record.grossSalary,
+          deductions: record.deductions,
+          bonuses: record.bonuses,
+          netSalary: record.netSalary
+        };
+      });
+
+      const n8nResult = await N8nService.triggerPayroll(
+        Number(month),
+        Number(year),
+        req.user?.companyId || '',
+        webhookRecords
+      );
 
       res.status(200).json({
         message: 'Payroll cycle processed successfully.',

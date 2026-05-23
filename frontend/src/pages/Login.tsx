@@ -1,164 +1,150 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Shield, Sparkles, KeyRound, Mail, AlertCircle } from 'lucide-react';
-import { api } from '../services/api';
+import React, { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { AxiosError } from 'axios';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { useToast } from '../components/ui/Toast';
+import { authService, saveSession } from '../services/auth';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
+  const errors = useMemo(() => ({
+    email: !email ? 'Email is required' : !/^\S+@\S+\.\S+$/.test(email) ? 'Enter a valid email address' : '',
+    password: !password ? 'Password is required' : ''
+  }), [email, password]);
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setTouched({ email: true, password: true });
+
+    if (errors.email || errors.password) return;
 
     setError('');
     setLoading(true);
 
     try {
-      const data = await api.auth.login({ email, password });
-      
-      // Store token and user properties
-      localStorage.setItem('intellihr_token', data.token);
-      localStorage.setItem('intellihr_user', JSON.stringify(data.user));
-
-      navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      const data = await authService.login({ email, password });
+      saveSession(data);
+      toast({ type: 'success', title: 'Welcome back', message: 'Your workspace is ready.' });
+      navigate('/dashboard');
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setError(axiosError.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickFill = (role: 'hr' | 'employee') => {
-    if (role === 'hr') {
-      setEmail('hr@intellihr.com');
-    } else {
-      setEmail('employee@intellihr.com');
-    }
-    setPassword('password123');
-  };
-
   return (
-    <div className="min-h-screen relative flex items-center justify-center bg-[#0a0f1d] overflow-hidden px-4">
-      {/* Background Neon Glowing Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-indigo-600/10 blur-[120px] glow-bg" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[150px] glow-bg" style={{ animationDelay: '2s' }} />
-
-      {/* Main Container */}
-      <div className="w-full max-w-md relative z-10 space-y-6">
-        
-        {/* Logo brand */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xl shadow-indigo-500/20 mx-auto text-xl">
-            iH
+    <div className="grid min-h-screen bg-slate-50 lg:grid-cols-[1fr_560px]">
+      <section className="hidden bg-slate-950 px-12 py-10 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-500 text-lg font-bold">iH</div>
+          <div>
+            <p className="text-lg font-bold">IntelliHR</p>
+            <p className="text-sm text-slate-400">Enterprise people operations</p>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
-            IntelliHR Portal
+        </div>
+
+        <div className="max-w-xl">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-indigo-200">
+            <ShieldCheck className="h-4 w-4" />
+            Secure HR command center
+          </div>
+          <h1 className="text-5xl font-bold leading-tight tracking-tight">
+            Manage people, attendance, leave, and payroll from one clean workspace.
           </h1>
-          <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase flex items-center justify-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            AI & n8n Orchestrated SaaS
+          <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">
+            Built for HR teams that need role-aware access, workflow automation, and a calmer daily operating rhythm.
           </p>
         </div>
 
-        {/* Login Glassmorphic Box */}
-        <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-xl space-y-6">
-          <h3 className="text-lg font-bold text-slate-100">Sign In</h3>
-
-          {error && (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          {['JWT protected routes', 'n8n email workflows', 'Role-based access'].map((item) => (
+            <div key={item} className="rounded-lg border border-white/10 bg-white/5 p-4 text-slate-300">
+              {item}
             </div>
-          )}
+          ))}
+        </div>
+      </section>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            
-            {/* Email Input */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block">
-                Email Address
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  id="input_email"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-600 transition-all focus:outline-none"
-                  required
-                />
-                <Mail className="w-4 h-4 text-slate-600 absolute left-3.5 top-3.5" />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  id="input_password"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-600 transition-all focus:outline-none"
-                  required
-                />
-                <KeyRound className="w-4 h-4 text-slate-600 absolute left-3.5 top-3.5" />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              id="btn_login_submit"
-              className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
-            >
-              {loading ? 'Authenticating...' : 'Sign In To Workspace'}
-            </button>
-
-          </form>
-
-          {/* Quick-fill helper chips for sandbox runs */}
-          <div className="border-t border-slate-800/80 pt-5 space-y-3">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block text-center">
-              Quick Sandbox Credentials
-            </span>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('hr')}
-                className="px-3 py-2 rounded-xl bg-slate-950/40 hover:bg-slate-950 border border-slate-800 hover:border-slate-700 text-[10px] font-bold text-indigo-400 flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                HR Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('employee')}
-                className="px-3 py-2 rounded-xl bg-slate-950/40 hover:bg-slate-950 border border-slate-800 hover:border-slate-700 text-[10px] font-bold text-slate-300 flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Shield className="w-3.5 h-3.5 text-slate-500" />
-                Employee
-              </button>
-            </div>
+      <main className="flex items-center justify-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center lg:hidden">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white">iH</div>
+            <h1 className="text-2xl font-bold text-slate-950">IntelliHR</h1>
           </div>
 
+          <Card className="p-6 sm:p-8">
+            <div className="mb-6">
+              <p className="text-sm font-semibold text-indigo-600">Sign in</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Open your workspace</h2>
+              <p className="mt-2 text-sm text-slate-500">Use your company email to continue.</p>
+            </div>
+
+            {error && (
+              <div className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <Input
+                id="input_email"
+                label="Email address"
+                icon={Mail}
+                type="email"
+                value={email}
+                onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="name@company.com"
+                error={touched.email ? errors.email : ''}
+                autoComplete="email"
+              />
+
+              <Input
+                id="input_password"
+                label="Password"
+                icon={KeyRound}
+                type="password"
+                value={password}
+                onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                error={touched.password ? errors.password : ''}
+                autoComplete="current-password"
+              />
+
+              <div className="flex items-center justify-end text-sm">
+                <Link to="/forgot-password" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                  Forgot password?
+                </Link>
+              </div>
+
+              <Button id="btn_login_submit" type="submit" size="lg" className="w-full" loading={loading}>
+                Sign in
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-slate-600">
+              New to IntelliHR?{' '}
+              <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                Create an account
+              </Link>
+            </p>
+          </Card>
         </div>
-
-        <p className="text-center text-[10px] text-slate-600">
-          IntelliHR Platform © 2026. All rights secured under system TLS encryption.
-        </p>
-
-      </div>
+      </main>
     </div>
   );
 };

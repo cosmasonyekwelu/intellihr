@@ -1,45 +1,58 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Search, 
-  Trash2, 
-  Edit3, 
-  TrendingUp, 
-  TrendingDown, 
-  X, 
-  UserPlus
-} from 'lucide-react';
+import { Edit3, Search, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { Avatar } from '../components/ui/Avatar';
+import { Button } from '../components/ui/Button';
+import { Card, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { Input, Select, Textarea } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { Table, TableShell, Td, Th } from '../components/ui/Table';
+import { useToast } from '../components/ui/Toast';
+import { InviteEmployeeModal } from '../components/employees/InviteEmployeeModal';
 import { api } from '../services/api';
 
+const departments = ['Engineering', 'Sales', 'Marketing', 'Human Resources', 'Operations', 'Finance'];
+const emptyForm = {
+  name: '',
+  email: '',
+  phone: '',
+  position: '',
+  department: '',
+  salary: 3000,
+  status: 'active',
+  performanceRating: 3,
+  photo: null as File | null
+};
+
 export const Employees: React.FC = () => {
+  const { toast } = useToast();
   const [employees, setEmployees] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
-
-  // Modal forms
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-  const [selectedId, setSelectedId] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    position: '',
-    department: '',
-    salary: 3000,
-    status: 'active',
-    performanceRating: 3,
-    photo: null as File | null
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionEmployee, setActionEmployee] = useState<any>(null);
+  const [actionForm, setActionForm] = useState({
+    action: 'promote',
+    value: '',
+    startDate: '',
+    endDate: '',
+    paid: false,
+    reason: ''
   });
+  const [selectedId, setSelectedId] = useState('');
+  const [formData, setFormData] = useState(emptyForm);
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const data = await api.employees.list({ search, department, status });
+      const data = await api.employees.list({ search, department, status, limit: 100 });
       setEmployees(data.employees || []);
-    } catch (err) {
-      console.error('Error fetching employees:', err);
+    } catch {
+      toast({ type: 'error', title: 'Could not load employees' });
     } finally {
       setLoading(false);
     }
@@ -49,400 +62,313 @@ export const Employees: React.FC = () => {
     fetchEmployees();
   }, [search, department, status]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const data = new FormData();
-      data.append('name', formData.name);
-      data.append('email', formData.email);
-      data.append('phone', formData.phone);
-      data.append('position', formData.position);
-      data.append('department', formData.department);
-      data.append('salary', formData.salary.toString());
-      data.append('status', formData.status);
-      data.append('performanceRating', formData.performanceRating.toString());
-      if (formData.photo) {
-        data.append('photo', formData.photo);
-      }
-
-      if (modalMode === 'create') {
-        await api.employees.create(data);
-      } else {
-        await api.employees.update(selectedId, data);
-      }
-      setShowModal(false);
-      fetchEmployees();
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        position: '',
-        department: '',
-        salary: 3000,
-        status: 'active',
-        performanceRating: 3,
-        photo: null
-      });
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Error processing request');
-    }
+  const resetForm = () => {
+    setFormData(emptyForm);
+    setSelectedId('');
   };
 
-  const handleEdit = (emp: any) => {
-    setSelectedId(emp._id);
+  const handleEdit = (employee: any) => {
+    setSelectedId(employee._id);
     setFormData({
-      name: emp.name,
-      email: emp.email,
-      phone: emp.phone,
-      position: emp.position,
-      department: emp.department,
-      salary: emp.salary,
-      status: emp.status,
-      performanceRating: emp.performanceRating || 3,
+      name: employee.name,
+      email: employee.email,
+      phone: employee.phone,
+      position: employee.position,
+      department: employee.department,
+      salary: employee.salary,
+      status: employee.status,
+      performanceRating: employee.performanceRating || 3,
       photo: null
     });
-    setModalMode('edit');
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this employee?')) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
     try {
-      await api.employees.delete(id);
+      const data = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null) data.append(key, value instanceof File ? value : String(value));
+      });
+
+      await api.employees.update(selectedId, data);
+      toast({ type: 'success', title: 'Employee updated' });
+
+      setShowModal(false);
+      resetForm();
       fetchEmployees();
-    } catch (err) {
-      console.error('Failed deleting employee:', err);
+    } catch (err: any) {
+      toast({ type: 'error', title: 'Employee save failed', message: err.response?.data?.message || 'Please review the form.' });
     }
   };
 
-  const departments = ['Engineering', 'Sales', 'Marketing', 'Human Resources', 'Tech'];
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this employee record?')) return;
+
+    try {
+      await api.employees.delete(id);
+      toast({ type: 'success', title: 'Employee removed' });
+      fetchEmployees();
+    } catch {
+      toast({ type: 'error', title: 'Delete failed' });
+    }
+  };
+
+  const openAction = (employee: any) => {
+    setActionEmployee(employee);
+    setActionForm({ action: 'promote', value: '', startDate: '', endDate: '', paid: false, reason: '' });
+    setActionOpen(true);
+  };
+
+  const submitAction = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!actionEmployee) return;
+
+    try {
+      if (actionForm.action === 'promote') {
+        await api.employees.promote(actionEmployee._id, { toPosition: actionForm.value, reason: actionForm.reason });
+      } else if (actionForm.action === 'transfer') {
+        await api.employees.transfer(actionEmployee._id, { toDept: actionForm.value, reason: actionForm.reason });
+      } else if (actionForm.action === 'warning') {
+        await api.employees.warn(actionEmployee._id, { type: actionForm.value as any, reason: actionForm.reason });
+      } else if (actionForm.action === 'suspend') {
+        await api.employees.suspend(actionEmployee._id, {
+          startDate: actionForm.startDate,
+          endDate: actionForm.endDate,
+          reason: actionForm.reason,
+          paid: actionForm.paid
+        });
+      } else if (actionForm.action === 'terminate') {
+        await api.employees.terminate(actionEmployee._id, { type: actionForm.value as any, reason: actionForm.reason });
+      }
+      toast({ type: 'success', title: 'Employee action recorded' });
+      setActionOpen(false);
+      fetchEmployees();
+    } catch (err: any) {
+      toast({ type: 'error', title: 'Action failed', message: err.response?.data?.message || 'Please review the action details.' });
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300">
-      
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-extrabold text-white tracking-tight">Employee Directory</h1>
-          <p className="text-xs text-slate-500">Add, modify, and review employee active directories</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Employee directory</h1>
+          <p className="mt-1 text-sm text-slate-500">Invite employees, monitor registration status, and manage workforce records.</p>
         </div>
-        
-        <button
-          onClick={() => {
-            setFormData({
-              name: '',
-              email: '',
-              phone: '',
-              position: '',
-              department: '',
-              salary: 3000,
-              status: 'active',
-              performanceRating: 3,
-              photo: null
-            });
-            setModalMode('create');
-            setShowModal(true);
-          }}
-          id="btn_add_employee"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg shadow-indigo-600/10 transition-all hover:scale-[1.01]"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add Employee
-        </button>
+        <Button id="btn_invite_employee" onClick={() => setInviteOpen(true)}>
+          <UserPlus className="h-4 w-4" />
+          Invite employee
+        </Button>
       </div>
 
-      {/* Advanced Filter Panel */}
-      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        {/* Search */}
-        <div className="relative w-full md:w-80">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, role, email..."
+      <Card>
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_180px]">
+          <Input
             id="input_search_employee"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-500 transition-colors focus:outline-none"
+            icon={Search}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, role, or email"
+            aria-label="Search employees"
           />
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 w-full md:w-auto items-center">
-          
-          <select
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            id="filter_department"
-            className="px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
-          >
-            <option value="">All Departments</option>
-            {departments.map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            id="filter_status"
-            className="px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
-          >
-            <option value="">All Statuses</option>
+          <Select id="filter_department" value={department} onChange={(event) => setDepartment(event.target.value)} aria-label="Filter by department">
+            <option value="">All departments</option>
+            {departments.map((item) => <option key={item} value={item}>{item}</option>)}
+          </Select>
+          <Select id="filter_status" value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="invited">Invited</option>
             <option value="active">Active</option>
-            <option value="on_leave">On Leave</option>
-            <option value="terminated">Terminated</option>
-          </select>
-
+            <option value="inactive">Inactive</option>
+          </Select>
         </div>
-      </div>
+      </Card>
 
-      {/* Directory Table */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <Card padded={false}>
+        <CardHeader className="mb-0 border-b border-slate-200 p-5">
+          <div>
+            <CardTitle>People</CardTitle>
+            <CardDescription>{employees.length} records in this view</CardDescription>
+          </div>
+        </CardHeader>
+
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-500">Loading directory...</div>
+          <SkeletonLoader rows={5} className="p-5" />
         ) : employees.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-500">No employees match this filter parameter.</div>
+          <div className="p-12 text-center">
+            <Users className="mx-auto h-10 w-10 text-slate-300" />
+            <p className="mt-3 font-semibold text-slate-950">No employees found</p>
+            <p className="mt-1 text-sm text-slate-500">Adjust the filters or invite your first team member.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <TableShell className="border-0">
+            <Table>
               <thead>
-                <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">Photo</th>
-                  <th className="pb-3 font-semibold">Employee</th>
-                  <th className="pb-3 font-semibold">Department</th>
-                  <th className="pb-3 font-semibold">Salary (Mo)</th>
-                  <th className="pb-3 font-semibold">Performance</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 text-right font-semibold">Actions</th>
+                <tr>
+                  <Th>Employee</Th>
+                  <Th>Department</Th>
+                  <Th>Salary</Th>
+                  <Th>Performance</Th>
+                  <Th>Status</Th>
+                  <Th className="text-right">Actions</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {employees.map((emp) => (
-                  <tr key={emp._id} className="hover:bg-slate-950/20 group transition-colors">
-                    <td className="py-4">
-                      {emp.photoUrl ? (
-                        <img src={emp.photoUrl} alt={emp.name} className="w-10 h-10 rounded-full object-cover border border-slate-700" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 font-bold">
-                          {emp.name.charAt(0)}
+              <tbody className="divide-y divide-slate-100">
+                {employees.map((employee) => (
+                  <tr key={employee._id} className="transition hover:bg-slate-50">
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={employee.name} src={employee.photoUrl} />
+                        <div>
+                          <p className="font-semibold text-slate-950">{employee.name}</p>
+                          <p className="text-xs text-slate-500">{employee.position} • {employee.email}</p>
                         </div>
-                      )}
-                    </td>
-                    <td className="py-4">
-                      <div className="font-bold text-slate-200">{emp.name}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{emp.position} • {emp.email}</div>
-                    </td>
-                    <td className="py-4 text-slate-350 font-medium">
-                      {emp.department}
-                    </td>
-                    <td className="py-4 font-mono font-bold text-slate-200">
-                      ${emp.salary.toLocaleString()}
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${emp.performanceRating >= 4 ? 'bg-emerald-500/10 text-emerald-400' : emp.performanceRating <= 2 ? 'bg-rose-500/10 text-rose-400' : 'bg-slate-800 text-slate-400'}`}>
-                          {emp.performanceRating}/5
-                        </span>
-                        {emp.performanceRating >= 4 ? (
-                          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : emp.performanceRating <= 2 ? (
-                          <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-                        ) : null}
                       </div>
-                    </td>
-                    <td className="py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                        emp.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
-                        emp.status === 'on_leave' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 
-                        'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                      }`}>
-                        {emp.status.replace('_', ' ')}
+                    </Td>
+                    <Td>{employee.department}</Td>
+                    <Td className="font-semibold text-slate-950">${employee.salary.toLocaleString()}</Td>
+                    <Td>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {employee.performanceRating || 3}/5
                       </span>
-                    </td>
-                    <td className="py-4 text-right space-x-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleEdit(emp)}
-                        className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-400 transition-all inline-flex items-center"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(emp._id)}
-                        className="p-2 rounded-lg bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-400 transition-all inline-flex items-center"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+                    </Td>
+                    <Td>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                        employee.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
+                          employee.status === 'invited' ? 'bg-amber-50 text-amber-700' :
+                            'bg-slate-100 text-slate-700'
+                      }`}>
+                        {employee.status.replace('_', ' ')}
+                      </span>
+                    </Td>
+                    <Td className="text-right">
+                      <div className="inline-flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(employee)} aria-label={`Edit ${employee.name}`}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => openAction(employee)}>
+                          Actions
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(employee._id)} aria-label={`Delete ${employee.name}`}>
+                          <Trash2 className="h-4 w-4 text-rose-600" />
+                        </Button>
+                      </div>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableShell>
         )}
-      </div>
+      </Card>
 
-      {/* Slide-over or Modal Overlay */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-6 shadow-2xl animate-in scale-in duration-200">
-            
-            <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">
-                {modalMode === 'create' ? 'Add New Employee' : 'Edit Employee Settings'}
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-slate-300">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Edit employee</h2>
+                <p className="text-sm text-slate-500">Keep profile and compensation details current.</p>
+              </div>
+              <button type="button" onClick={() => setShowModal(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                
-                <div className="space-y-1.5 col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employee Photo</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setFormData({ ...formData, photo: e.target.files?.[0] || null })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:border-indigo-500 focus:outline-none file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5 col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-700 focus:border-indigo-500 focus:outline-none"
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-700 focus:border-indigo-500 focus:outline-none"
-                    placeholder="john@company.com"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-700 focus:border-indigo-500 focus:outline-none"
-                    placeholder="+1 555-0199"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Department</label>
-                  <select
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
-                    required
-                  >
-                    <option value="">Select Dept</option>
-                    {departments.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Job Position</label>
-                  <input
-                    type="text"
-                    value={formData.position}
-                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-700 focus:border-indigo-500 focus:outline-none"
-                    placeholder="Senior Developer"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Monthly Salary ($)</label>
-                  <input
-                    type="number"
-                    value={formData.salary}
-                    onChange={(e) => setFormData({ ...formData, salary: parseInt(e.target.value, 10) })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white focus:border-indigo-500 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Account Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
-                    required
-                  >
-                    <option value="active">Active</option>
-                    <option value="on_leave">On Leave</option>
-                    <option value="terminated">Terminated</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex justify-between">
-                    <span>Performance Rating (Review)</span>
-                    <span className="text-indigo-400 font-bold font-mono">{formData.performanceRating}/5</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="5"
-                    step="1"
-                    value={formData.performanceRating}
-                    onChange={(e) => setFormData({ ...formData, performanceRating: parseInt(e.target.value, 10) })}
-                    className="w-full accent-indigo-600"
-                  />
-                  <div className="flex justify-between text-[9px] font-bold text-slate-500 font-mono">
-                    <span>1 (Poor)</span>
-                    <span>3 (Normal)</span>
-                    <span>5 (Outstanding)</span>
-                  </div>
-                </div>
-
+            <form onSubmit={handleSubmit} className="space-y-5 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="Full name" value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} required />
+                <Input label="Email" type="email" value={formData.email} onChange={(event) => setFormData({ ...formData, email: event.target.value })} required />
+                <Input label="Phone" value={formData.phone} onChange={(event) => setFormData({ ...formData, phone: event.target.value })} />
+                <Input label="Job title" value={formData.position} onChange={(event) => setFormData({ ...formData, position: event.target.value })} required />
+                <Select label="Department" value={formData.department} onChange={(event) => setFormData({ ...formData, department: event.target.value })} required>
+                  <option value="">Select department</option>
+                  {departments.map((item) => <option key={item} value={item}>{item}</option>)}
+                </Select>
+                <Input label="Monthly salary" type="number" value={formData.salary} onChange={(event) => setFormData({ ...formData, salary: Number(event.target.value) })} required />
+                <Select label="Status" value={formData.status} onChange={(event) => setFormData({ ...formData, status: event.target.value })} required>
+                  <option value="active">Active</option>
+                  <option value="invited">Invited</option>
+                  <option value="inactive">Inactive</option>
+                </Select>
+                <Input label="Photo" type="file" accept="image/*" onChange={(event) => setFormData({ ...formData, photo: event.target.files?.[0] || null })} />
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-400 text-xs font-bold transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  id="btn_submit_employee_modal"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/10 transition-all"
-                >
-                  {modalMode === 'create' ? 'Confirm Hiring' : 'Save Adjustments'}
-                </button>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700">Performance rating</span>
+                  <span className="font-semibold text-indigo-600">{formData.performanceRating}/5</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={formData.performanceRating}
+                  onChange={(event) => setFormData({ ...formData, performanceRating: Number(event.target.value) })}
+                  className="w-full accent-indigo-600"
+                />
               </div>
 
+              <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
+                <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button id="btn_submit_employee_modal" type="submit">Save changes</Button>
+              </div>
             </form>
-
-          </div>
+          </Card>
         </div>
       )}
+      <InviteEmployeeModal open={inviteOpen} onClose={() => setInviteOpen(false)} onInvited={fetchEmployees} />
+      <Modal open={actionOpen} onClose={() => setActionOpen(false)} title="Employee action" description={actionEmployee ? `Record an HR action for ${actionEmployee.name}.` : undefined}>
+        <form onSubmit={submitAction} className="space-y-4 p-5">
+          <Select label="Action" value={actionForm.action} onChange={(event) => setActionForm({ ...actionForm, action: event.target.value, value: '' })}>
+            <option value="promote">Promotion</option>
+            <option value="transfer">Transfer</option>
+            <option value="warning">Warning</option>
+            <option value="suspend">Suspension</option>
+            <option value="terminate">Termination</option>
+          </Select>
 
+          {['promote', 'transfer', 'warning', 'terminate'].includes(actionForm.action) && (
+            <Select label={actionForm.action === 'warning' ? 'Warning type' : actionForm.action === 'terminate' ? 'Termination type' : actionForm.action === 'transfer' ? 'New department' : 'New position'} value={actionForm.value} onChange={(event) => setActionForm({ ...actionForm, value: event.target.value })} required>
+              <option value="">Select value</option>
+              {actionForm.action === 'warning' && (
+                <>
+                  <option value="verbal">Verbal</option>
+                  <option value="written">Written</option>
+                  <option value="final">Final</option>
+                </>
+              )}
+              {actionForm.action === 'terminate' && (
+                <>
+                  <option value="layoff">Layoff</option>
+                  <option value="fired">Fired</option>
+                </>
+              )}
+              {actionForm.action === 'transfer' && departments.map((department) => <option key={department} value={department}>{department}</option>)}
+              {actionForm.action === 'promote' && ['Senior Associate', 'Team Lead', 'Manager', 'Director'].map((position) => <option key={position} value={position}>{position}</option>)}
+            </Select>
+          )}
+
+          {actionForm.action === 'suspend' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input label="Start date" type="date" value={actionForm.startDate} onChange={(event) => setActionForm({ ...actionForm, startDate: event.target.value })} required />
+              <Input label="End date" type="date" value={actionForm.endDate} onChange={(event) => setActionForm({ ...actionForm, endDate: event.target.value })} required />
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input type="checkbox" checked={actionForm.paid} onChange={(event) => setActionForm({ ...actionForm, paid: event.target.checked })} className="accent-indigo-600" />
+                Paid suspension
+              </label>
+            </div>
+          )}
+
+          <Textarea label="Reason" value={actionForm.reason} onChange={(event) => setActionForm({ ...actionForm, reason: event.target.value })} required />
+          <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
+            <Button type="button" variant="outline" onClick={() => setActionOpen(false)}>Cancel</Button>
+            <Button type="submit">Record action</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

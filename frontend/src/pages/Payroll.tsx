@@ -1,31 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Settings, 
-  Download, 
-  HelpCircle,
-  Play
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, HelpCircle, Play, Settings } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { Card, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { Select } from '../components/ui/Input';
+import { Table, TableShell, Td, Th } from '../components/ui/Table';
+import { useToast } from '../components/ui/Toast';
 import { api } from '../services/api';
+import { getCurrentUser } from '../services/auth';
 
 export const Payroll: React.FC = () => {
+  const { toast } = useToast();
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [n8nStatus, setN8nStatus] = useState('');
-
-  const userString = localStorage.getItem('intellihr_user');
-  const user = userString ? JSON.parse(userString) : null;
-  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+  const user = getCurrentUser();
+  const isHR = user?.role === 'hr';
 
   const fetchPayroll = async () => {
     try {
       setLoading(true);
       const data = await api.payroll.list({ month, year });
       setRecords(data.records || []);
-    } catch (err) {
-      console.error('Failed fetching payroll:', err);
+    } catch {
+      toast({ type: 'error', title: 'Could not load payroll' });
     } finally {
       setLoading(false);
     }
@@ -35,165 +35,143 @@ export const Payroll: React.FC = () => {
     fetchPayroll();
   }, [month, year]);
 
+  const totals = useMemo(() => {
+    return records.reduce((summary, record) => ({
+      gross: summary.gross + record.grossSalary,
+      bonuses: summary.bonuses + record.bonuses,
+      net: summary.net + record.netSalary
+    }), { gross: 0, bonuses: 0, net: 0 });
+  }, [records]);
+
   const handleRunPayroll = async () => {
-    if (!window.confirm(`Are you sure you want to execute the monthly payroll cycle for ${month}/${year}?`)) return;
+    if (!window.confirm(`Execute payroll cycle for ${month}/${year}?`)) return;
 
     setRunning(true);
-    setN8nStatus('Contacting n8n webhook triggers...');
+    setN8nStatus('Contacting n8n workflow...');
 
     try {
       const response = await api.payroll.run({ month, year });
-      setN8nStatus(`Payroll cycle processed! Local: ${response.localCalculations ? 'Yes' : 'No'}, Workers Calculated: ${response.count}`);
+      setN8nStatus(`Processed ${response.count} payroll records.`);
+      toast({ type: 'success', title: 'Payroll cycle complete' });
       fetchPayroll();
     } catch (err: any) {
-      setN8nStatus(`Failed to trigger: ${err.message}. Running fallback local calculations...`);
-      // Re-fetch to load fallbacks
-      setTimeout(() => {
-        fetchPayroll();
-      }, 1000);
+      setN8nStatus(`Workflow failed: ${err.message}`);
+      toast({ type: 'error', title: 'Payroll run failed' });
     } finally {
       setRunning(false);
     }
   };
 
-  const getDeductionsTotal = (ded: any) => {
-    if (!ded) return 0;
-    return (ded.tax || 0) + (ded.pension || 0) + (ded.loan || 0);
+  const deductionsTotal = (deductions: any) => {
+    if (!deductions) return 0;
+    return (deductions.tax || 0) + (deductions.pension || 0) + (deductions.loan || 0);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300">
-      
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-extrabold text-white tracking-tight">Payroll Ledger</h1>
-          <p className="text-xs text-slate-500">Monitor salaries, bonuses, and tax deductions calculations</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Payroll</h1>
+          <p className="mt-1 text-sm text-slate-500">Review compensation, deductions, and generated payslips.</p>
         </div>
-
-        {/* Month selectors */}
-        <div className="flex gap-3 items-center">
-          <select
-            value={month}
-            onChange={(e) => setMonth(parseInt(e.target.value, 10))}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-              <option key={m} value={m}>
-                {new Date(2000, m - 1, 1).toLocaleString(undefined, { month: 'long' })}
-              </option>
+        <div className="grid grid-cols-2 gap-3 sm:w-72">
+          <Select value={month} onChange={(event) => setMonth(Number(event.target.value))} aria-label="Month">
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((item) => (
+              <option key={item} value={item}>{new Date(2000, item - 1, 1).toLocaleString(undefined, { month: 'long' })}</option>
             ))}
-          </select>
-
-          <select
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value, 10))}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            {[2025, 2026, 2027].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          </Select>
+          <Select value={year} onChange={(event) => setYear(Number(event.target.value))} aria-label="Year">
+            {[2025, 2026, 2027].map((item) => <option key={item} value={item}>{item}</option>)}
+          </Select>
         </div>
       </div>
 
-      {/* Manual Trigger Panel (HR managers only) */}
-      {isAdminOrHR && (
-        <div className="p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-widest flex items-center gap-1.5">
-              <Settings className="w-4 h-4 text-indigo-400" />
-              Administrative Operations Control
-            </h3>
-            <p className="text-[11px] text-slate-400 leading-normal max-w-xl">
-              Initiate calculations, generate PDF payslips, and dispatch email/WhatsApp alerts automatically using the n8n scheduler.
-            </p>
-            {n8nStatus && (
-              <p className="text-[10px] text-indigo-300 font-semibold font-mono animate-pulse">{n8nStatus}</p>
-            )}
-          </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card><p className="text-sm text-slate-500">Gross salary</p><p className="mt-2 text-3xl font-bold text-slate-950">${totals.gross.toLocaleString()}</p></Card>
+        <Card><p className="text-sm text-slate-500">Bonuses</p><p className="mt-2 text-3xl font-bold text-emerald-700">${totals.bonuses.toLocaleString()}</p></Card>
+        <Card><p className="text-sm text-slate-500">Net payroll</p><p className="mt-2 text-3xl font-bold text-indigo-700">${totals.net.toLocaleString()}</p></Card>
+      </div>
 
-          <button
-            onClick={handleRunPayroll}
-            disabled={running}
-            id="btn_trigger_payroll"
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-xs font-bold text-white shadow-lg shadow-indigo-600/10 transition-all hover:scale-[1.01]"
-          >
-            <Play className="w-4 h-4" />
-            {running ? 'Processing payroll...' : 'Execute Payroll Cycle'}
-          </button>
-        </div>
+      {isHR && (
+        <Card className="border-indigo-200 bg-indigo-50">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-indigo-900">
+                <Settings className="h-4 w-4" />
+                Payroll operations control
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-900/75">
+                Trigger calculations, generate PDF payslips, and hand off notifications to n8n workflows.
+              </p>
+              {n8nStatus && <p className="mt-2 text-sm font-semibold text-indigo-700">{n8nStatus}</p>}
+            </div>
+            <Button id="btn_trigger_payroll" onClick={handleRunPayroll} loading={running}>
+              <Play className="h-4 w-4" />
+              Execute payroll
+            </Button>
+          </div>
+        </Card>
       )}
 
-      {/* Payroll Registry table */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800">
-        
+      <Card padded={false}>
+        <CardHeader className="mb-0 border-b border-slate-200 p-5">
+          <div>
+            <CardTitle>Payroll ledger</CardTitle>
+            <CardDescription>Monthly payroll records and payslip files.</CardDescription>
+          </div>
+        </CardHeader>
+
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-500">Loading payroll ledger...</div>
+          <div className="space-y-3 p-5">
+            {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-slate-100" />)}
+          </div>
         ) : records.length === 0 ? (
-          <div className="py-16 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl space-y-2">
-            <HelpCircle className="w-7 h-7 text-slate-650 mx-auto" />
-            <p>No payroll records computed for this period.</p>
+          <div className="p-12 text-center">
+            <HelpCircle className="mx-auto h-10 w-10 text-slate-300" />
+            <p className="mt-3 font-semibold text-slate-950">No payroll records</p>
+            <p className="mt-1 text-sm text-slate-500">Run payroll or choose another month.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <TableShell className="border-0">
+            <Table>
               <thead>
-                <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">Employee</th>
-                  <th className="pb-3 font-semibold">Gross Salary</th>
-                  <th className="pb-3 font-semibold">Bonuses</th>
-                  <th className="pb-3 font-semibold">Deductions</th>
-                  <th className="pb-3 font-semibold">Net Take-Home</th>
-                  <th className="pb-3 text-right font-semibold">Payslip</th>
+                <tr>
+                  <Th>Employee</Th>
+                  <Th>Gross</Th>
+                  <Th>Bonuses</Th>
+                  <Th>Deductions</Th>
+                  <Th>Net</Th>
+                  <Th className="text-right">Payslip</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {records.map((rec) => (
-                  <tr key={rec._id} className="hover:bg-slate-950/20 group">
-                    <td className="py-4">
-                      <div className="font-bold text-slate-200">{rec.employeeId?.name || 'Unknown'}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{rec.employeeId?.position || 'Employee'}</div>
-                    </td>
-                    <td className="py-4 font-mono text-slate-300">
-                      ${rec.grossSalary.toLocaleString()}
-                    </td>
-                    <td className="py-4 font-mono text-emerald-400 font-bold">
-                      +${rec.bonuses.toLocaleString()}
-                    </td>
-                    <td className="py-4 font-mono text-rose-400">
-                      -${getDeductionsTotal(rec.deductions).toLocaleString()}
-                      <span className="text-[9px] text-slate-500 block">
-                        (Tax: ${rec.deductions?.tax}, Pen: ${rec.deductions?.pension})
-                      </span>
-                    </td>
-                    <td className="py-4 font-mono text-slate-100 font-extrabold text-sm">
-                      ${rec.netSalary.toLocaleString()}
-                    </td>
-                    <td className="py-4 text-right">
-                      {rec.payslipUrl ? (
-                        <a
-                          href={rec.payslipUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 rounded-lg bg-slate-850 hover:bg-indigo-600 hover:text-white text-slate-400 font-bold transition-all text-[10px] inline-flex items-center gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Payslip PDF
+              <tbody className="divide-y divide-slate-100">
+                {records.map((record) => (
+                  <tr key={record._id} className="transition hover:bg-slate-50">
+                    <Td>
+                      <p className="font-semibold text-slate-950">{record.employeeId?.name || 'Unknown'}</p>
+                      <p className="text-xs text-slate-500">{record.employeeId?.position || 'Employee'}</p>
+                    </Td>
+                    <Td className="font-semibold text-slate-950">${record.grossSalary.toLocaleString()}</Td>
+                    <Td className="font-semibold text-emerald-700">+${record.bonuses.toLocaleString()}</Td>
+                    <Td className="font-semibold text-rose-700">-${deductionsTotal(record.deductions).toLocaleString()}</Td>
+                    <Td className="text-base font-bold text-slate-950">${record.netSalary.toLocaleString()}</Td>
+                    <Td className="text-right">
+                      {record.payslipUrl ? (
+                        <a href={record.payslipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                          <Download className="h-4 w-4" />
+                          PDF
                         </a>
                       ) : (
-                        <span className="text-[10px] text-slate-600 italic">Not available</span>
+                        <span className="text-sm text-slate-400">Unavailable</span>
                       )}
-                    </td>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableShell>
         )}
-
-      </div>
-
+      </Card>
     </div>
   );
 };

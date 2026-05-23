@@ -1,96 +1,67 @@
 {
-  "name": "IntelliHR Daily Leave Requests Digest",
+  "name": "IntelliHR Tenant Leave Digest",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "days"
-            }
-          ]
-        }
-      },
-      "id": "e1f7b036-7c9c-4613-8d09-b47209772d1a",
-      "name": "Daily Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        200,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "http://localhost:5000/api/leave",
+        "httpMethod": "POST",
+        "path": "leave-digest",
         "options": {}
       },
       "id": "e2f7b036-7c9c-4613-8d09-b47209772d1b",
-      "name": "Fetch Leave Requests",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
+      "name": "Backend Leave Digest Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
       "position": [
-        400,
+        300,
         300
       ]
     },
     {
       "parameters": {
-        "jsCode": "const requests = items[0].json.requests;\nconst pending = requests.filter(r => r.status === 'pending');\nif (pending.length === 0) {\n  return [{ json: { shouldSend: false } }];\n}\n\nlet html = '<h3>Awaiting Leave Approvals Summary</h3>';\nhtml += '<table border=\"1\" style=\"border-collapse: collapse; width:100%;\">';\nhtml += '<tr><th>Employee</th><th>Type</th><th>Duration</th></tr>';\npending.forEach(p => {\n  html += `<tr><td>${p.employeeId.name}</td><td>${p.type}</td><td>${p.startDate.substring(0,10)} to ${p.endDate.substring(0,10)}</td></tr>`;\n});\nhtml += '</table>';\n\nreturn [{\n  json: {\n    shouldSend: true,\n    htmlContent: html,\n    count: pending.length\n  }\n}];"
+        "jsCode": "const body = items[0].json.body || items[0].json;\nconst companyId = body.companyId;\nconst hrEmail = body.hrEmail;\nconst requests = body.requests || [];\nif (!companyId || !hrEmail) {\n  throw new Error('companyId and hrEmail are required for tenant-isolated leave digests');\n}\nconst pending = requests.filter((request) => request.status === 'pending');\nlet html = '<h3>Awaiting Leave Approvals Summary</h3>';\nhtml += '<table border=\"1\" style=\"border-collapse: collapse; width:100%;\">';\nhtml += '<tr><th>Employee</th><th>Leave type</th><th>Duration</th></tr>';\npending.forEach((request) => {\n  html += `<tr><td>${request.employeeName}</td><td>${request.leaveType}</td><td>${request.startDate} to ${request.endDate}</td></tr>`;\n});\nhtml += '</table>';\nreturn [{ json: { companyId, hrEmail, shouldSend: pending.length > 0, htmlContent: html, count: pending.length } }];"
       },
       "id": "e3f7b036-7c9c-4613-8d09-b47209772d1c",
-      "name": "Format Leave digest HTML",
+      "name": "Format Tenant Digest HTML",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        600,
+        560,
         300
       ]
     },
     {
       "parameters": {
-        "sendTo": "hr@intellihr.com",
+        "sendTo": "={{ $json.hrEmail }}",
         "subject": "=IntelliHR Digest: {{ $json.count }} Pending Leave Requests",
         "message": "={{ $json.htmlContent }}"
       },
       "id": "e4f7b036-7c9c-4613-8d09-b47209772d1d",
-      "name": "Mail HR Admin",
+      "name": "Mail Tenant HR Manager",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
       "position": [
-        800,
+        820,
         300
       ]
     }
   ],
   "connections": {
-    "Daily Schedule Trigger": {
+    "Backend Leave Digest Webhook": {
       "main": [
         [
           {
-            "node": "Fetch Leave Requests",
+            "node": "Format Tenant Digest HTML",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Leave Requests": {
+    "Format Tenant Digest HTML": {
       "main": [
         [
           {
-            "node": "Format Leave digest HTML",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Leave digest HTML": {
-      "main": [
-        [
-          {
-            "node": "Mail HR Admin",
+            "node": "Mail Tenant HR Manager",
             "type": "main",
             "index": 0
           }

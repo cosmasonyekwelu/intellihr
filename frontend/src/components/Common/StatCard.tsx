@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { Card } from '../ui/Card';
 
 interface StatCardProps {
   title: string;
@@ -9,63 +10,31 @@ interface StatCardProps {
   color?: 'indigo' | 'emerald' | 'amber' | 'rose' | 'sky';
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ 
-  title, 
-  value, 
-  icon: Icon, 
-  description, 
-  color = 'indigo' 
-}) => {
-  const colorMap = {
-    indigo: {
-      bg: 'bg-indigo-500/10',
-      text: 'text-indigo-400',
-      border: 'border-indigo-500/20',
-      glow: 'shadow-indigo-500/5'
-    },
-    emerald: {
-      bg: 'bg-emerald-500/10',
-      text: 'text-emerald-400',
-      border: 'border-emerald-500/20',
-      glow: 'shadow-emerald-500/5'
-    },
-    amber: {
-      bg: 'bg-amber-500/10',
-      text: 'text-amber-400',
-      border: 'border-amber-500/20',
-      glow: 'shadow-amber-500/5'
-    },
-    rose: {
-      bg: 'bg-rose-500/10',
-      text: 'text-rose-400',
-      border: 'border-rose-500/20',
-      glow: 'shadow-rose-500/5'
-    },
-    sky: {
-      bg: 'bg-sky-500/10',
-      text: 'text-sky-400',
-      border: 'border-sky-500/20',
-      glow: 'shadow-sky-500/5'
-    }
-  };
+const colorMap = {
+  indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+  rose: 'bg-rose-50 text-rose-700 ring-rose-100',
+  sky: 'bg-sky-50 text-sky-700 ring-sky-100'
+};
 
-  const selectedColor = colorMap[color];
-
-  return (
-    <div className={`p-6 rounded-2xl bg-slate-900 border ${selectedColor.border} shadow-lg ${selectedColor.glow} flex items-center justify-between transition-all duration-300 hover:-translate-y-1 hover:border-slate-700`}>
-      <div className="space-y-2">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-          {title}
-        </span>
-        <h3 className="text-3xl font-extrabold text-white tracking-tight">{value}</h3>
-        {description && (
-          <p className="text-xs text-slate-400 font-medium">{description}</p>
-        )}
+export const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  icon: Icon,
+  description,
+  color = 'indigo'
+}) => (
+  <Card className="transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-slate-500">{title}</p>
+        <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{value}</p>
+        {description && <p className="mt-2 text-sm text-slate-500">{description}</p>}
       </div>
-
-      <div className={`w-12 h-12 rounded-xl ${selectedColor.bg} ${selectedColor.text} flex items-center justify-center`}>
-        <Icon className="w-6 h-6" />
+      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ring-1 ${colorMap[color]}`}>
+        <Icon className="h-5 w-5" />
       </div>
     </div>
-  );
-};
+  </Card>
+);

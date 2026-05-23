@@ -32,6 +32,10 @@ export const api = {
       const response = await apiClient.post('/auth/login', credentials);
       return response.data;
     },
+    signup: async (data: any) => {
+      const response = await apiClient.post('/auth/signup', data);
+      return response.data;
+    },
     register: async (data: any) => {
       const response = await apiClient.post('/auth/register', data);
       return response.data;
@@ -68,6 +72,65 @@ export const api = {
       const response = await apiClient.delete(`/employees/${id}`);
       return response.data;
     },
+    invite: async (data: { name: string; email: string; phone?: string; position: string; department: string; salary?: number }) => {
+      const response = await apiClient.post('/employees/invite', data);
+      return response.data;
+    },
+    verifyInvite: async (token: string) => {
+      const response = await apiClient.get('/employees/invite/verify', { params: { token } });
+      return response.data;
+    },
+    promote: async (id: string, data: { toPosition: string; date?: string; reason: string }) => {
+      const response = await apiClient.post(`/employees/${id}/promote`, data);
+      return response.data;
+    },
+    transfer: async (id: string, data: { toDept: string; date?: string; reason: string }) => {
+      const response = await apiClient.post(`/employees/${id}/transfer`, data);
+      return response.data;
+    },
+    warn: async (id: string, data: { type: 'verbal' | 'written' | 'final'; date?: string; reason: string }) => {
+      const response = await apiClient.post(`/employees/${id}/warning`, data);
+      return response.data;
+    },
+    suspend: async (id: string, data: { startDate: string; endDate: string; reason: string; paid: boolean }) => {
+      const response = await apiClient.post(`/employees/${id}/suspend`, data);
+      return response.data;
+    },
+    terminate: async (id: string, data: { type: 'layoff' | 'fired'; reason: string; date?: string }) => {
+      const response = await apiClient.post(`/employees/${id}/terminate`, data);
+      return response.data;
+    },
+    resign: async (data: { reason: string; lastWorkingDay: string }) => {
+      const response = await apiClient.post('/employees/resign', data);
+      return response.data;
+    },
+    resignations: async () => {
+      const response = await apiClient.get('/employees/resignations');
+      return response.data;
+    },
+    reviewResignation: async (id: string, status: 'approved' | 'rejected') => {
+      const response = await apiClient.put(`/employees/resignations/${id}/review`, { status });
+      return response.data;
+    },
+  },
+
+  leaveTypes: {
+    list: async () => {
+      const response = await apiClient.get('/leave-types');
+      return response.data;
+    },
+    create: async (data: { name: string; allowedDays: number; carryOver: boolean; requiresApproval: boolean }) => {
+      const response = await apiClient.post('/leave-types', data);
+      return response.data;
+    },
+    update: async (id: string, data: { name: string; allowedDays: number; carryOver: boolean; requiresApproval: boolean }) => {
+      const response = await apiClient.put(`/leave-types/${id}`, data);
+      return response.data;
+    },
+    delete: async (id: string) => {
+      const response = await apiClient.delete(`/leave-types/${id}`);
+      return response.data;
+    },
   },
 
   // Attendance
@@ -92,12 +155,16 @@ export const api = {
       const response = await apiClient.get('/leave', { params });
       return response.data;
     },
-    submit: async (data: { type: 'sick' | 'annual' | 'unpaid'; startDate: string; endDate: string; reason: string }) => {
+    submit: async (data: { leaveTypeId: string; startDate: string; endDate: string; reason: string }) => {
       const response = await apiClient.post('/leave/request', data);
       return response.data;
     },
     approve: async (id: string, status: 'approved' | 'rejected') => {
       const response = await apiClient.put(`/leave/${id}/approve`, { status });
+      return response.data;
+    },
+    reject: async (id: string) => {
+      const response = await apiClient.put(`/leave/${id}/reject`);
       return response.data;
     },
   },
@@ -118,6 +185,21 @@ export const api = {
   ai: {
     ask: async (question: string) => {
       const response = await apiClient.post('/ai/ask', { question });
+      return response.data;
+    },
+  },
+
+  profile: {
+    get: async () => {
+      const response = await apiClient.get('/profile');
+      return response.data;
+    },
+    update: async (data: any) => {
+      const response = await apiClient.put('/profile', data);
+      return response.data;
+    },
+    changePassword: async (data: { currentPassword: string; newPassword: string }) => {
+      const response = await apiClient.post('/profile/change-password', data);
       return response.data;
     },
   },

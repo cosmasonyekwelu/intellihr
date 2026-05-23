@@ -118,11 +118,11 @@ export class AiService {
   /**
    * Primary route to ask the AI agent a question.
    */
-  static async askQuestion(question: string): Promise<string> {
+  static async askQuestion(question: string, companyId: string): Promise<string> {
     try {
       if (!openai) {
         // Safe sandbox fallback for local runs without API Keys
-        return this.getMockResponse(question);
+        return this.getMockResponse(question, companyId);
       }
 
       // 1. Initialize messages array with system and user query
@@ -162,19 +162,19 @@ Today's date is: ${new Date().toLocaleDateString()}.`
 
           // Execute corresponding Mongoose queries
           if (functionName === 'get_payroll_summary') {
-            functionResult = await this.dbGetPayrollSummary(args.month, args.year);
+            functionResult = await this.dbGetPayrollSummary(args.month, args.year, companyId);
           } else if (functionName === 'get_attendance_issues') {
-            functionResult = await this.dbGetAttendanceIssues(args.month, args.year);
+            functionResult = await this.dbGetAttendanceIssues(args.month, args.year, companyId);
           } else if (functionName === 'generate_hr_report') {
-            functionResult = await this.dbGenerateHrReport(args.reportType);
+            functionResult = await this.dbGenerateHrReport(args.reportType, companyId);
           } else if (functionName === 'get_underperforming_employees') {
-            functionResult = await this.dbGetUnderperformingEmployees();
+            functionResult = await this.dbGetUnderperformingEmployees(companyId);
           } else if (functionName === 'get_pending_leave_requests') {
-            functionResult = await this.dbGetPendingLeaveRequests();
+            functionResult = await this.dbGetPendingLeaveRequests(companyId);
           } else if (functionName === 'approve_leave_request') {
-            functionResult = await this.dbApproveLeaveRequest(args.requestId);
+            functionResult = await this.dbApproveLeaveRequest(args.requestId, companyId);
           } else if (functionName === 'trigger_payroll_run') {
-            functionResult = await this.dbTriggerPayroll(args.month, args.year);
+            functionResult = await this.dbTriggerPayroll(args.month, args.year, companyId);
           }
 
           // Push the tool result back into the OpenAI messages chain
@@ -194,13 +194,13 @@ Today's date is: ${new Date().toLocaleDateString()}.`
         const finalAnswer = secondResponse.choices[0].message.content || 'I could not generate an answer.';
         
         // Save conversation for RAG context
-        await Conversation.create({ userQuestion: question, aiAnswer: finalAnswer });
+        await Conversation.create({ companyId, userQuestion: question, aiAnswer: finalAnswer });
         return finalAnswer;
       }
 
       // No tool calls requested, return standard message
       const simpleResponse = choice.message.content || 'I could not process your query.';
-      await Conversation.create({ userQuestion: question, aiAnswer: simpleResponse });
+      await Conversation.create({ companyId, userQuestion: question, aiAnswer: simpleResponse });
       return simpleResponse;
     } catch (error: any) {
       console.error('[AI Service Error]:', error);
@@ -210,8 +210,8 @@ Today's date is: ${new Date().toLocaleDateString()}.`
 
   // ==================== DB Tool Query Implementations ====================
 
-  private static async dbGetPayrollSummary(month: number, year: number) {
-    const payrolls = await Payroll.find({ month, year });
+  private static async dbGetPayrollSummary(month: number, year: number, companyId: string) {
+    const payrolls = await Payroll.find({ companyId, month, year });
     if (!payrolls.length) {
       return { message: `No payroll records found for ${month}/${year}` };
     }
@@ -237,7 +237,7 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     // Fetch previous month to compare payroll differences if requested
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
-    const prevPayrolls = await Payroll.find({ month: prevMonth, year: prevYear });
+    const prevPayrolls = await Payroll.find({ companyId, month: prevMonth, year: prevYear });
     
     let prevTotalNet = 0;
     prevPayrolls.forEach(p => prevTotalNet += p.netSalary);
@@ -263,11 +263,12 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     };
   }
 
-  private static async dbGetAttendanceIssues(month: number, year: number) {
+  private static async dbGetAttendanceIssues(month: number, year: number, companyId: string) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     const issues = await Attendance.find({
+      companyId,
       date: { $gte: startDate, $lte: endDate },
       status: { $in: ['absent', 'late'] }
     }).populate('employeeId', 'name position department');
@@ -285,8 +286,8 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     });
   }
 
-  private static async dbGetUnderperformingEmployees() {
-    const employees = await Employee.find({ performanceRating: { $lte: 2 } });
+  private static async dbGetUnderperformingEmployees(companyId: string) {
+    const employees = await Employee.find({ companyId, performanceRating: { $lte: 2 } });
     return employees.map(emp => ({
       name: emp.name,
       department: emp.department,
@@ -297,20 +298,22 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     }));
   }
 
-  private static async dbGetPendingLeaveRequests() {
-    const requests = await LeaveRequest.find({ status: 'pending' }).populate('employeeId', 'name position department');
+  private static async dbGetPendingLeaveRequests(companyId: string) {
+    const requests = await LeaveRequest.find({ companyId, status: 'pending' })
+      .populate('employeeId', 'name position department')
+      .populate('leaveTypeId', 'name');
     return requests.map(r => ({
       requestId: r._id,
       employeeName: (r.employeeId as any)?.name || 'Unknown',
-      type: r.type,
+      type: (r.leaveTypeId as any)?.name || 'Leave',
       startDate: r.startDate.toLocaleDateString(),
       endDate: r.endDate.toLocaleDateString(),
       reason: r.reason
     }));
   }
 
-  private static async dbApproveLeaveRequest(requestId: string) {
-    const request = await LeaveRequest.findById(requestId).populate('employeeId');
+  private static async dbApproveLeaveRequest(requestId: string, companyId: string) {
+    const request = await LeaveRequest.findOne({ _id: requestId, companyId }).populate('employeeId');
     if (!request) {
       return { success: false, message: 'Leave request not found.' };
     }
@@ -321,9 +324,6 @@ Today's date is: ${new Date().toLocaleDateString()}.`
 
     request.status = 'approved';
     await request.save();
-
-    // Update employee status
-    await Employee.findByIdAndUpdate(request.employeeId, { status: 'on_leave' });
 
     // Notify employee
     const emp = request.employeeId as any;
@@ -338,9 +338,9 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     return { success: true, message: `Leave request for ${emp?.name} has been approved successfully.` };
   }
 
-  private static async dbTriggerPayroll(month: number, year: number) {
+  private static async dbTriggerPayroll(month: number, year: number, companyId: string) {
     // Trigger n8n workflow
-    const n8nResult = await N8nService.triggerPayroll(month, year);
+    const n8nResult = await N8nService.triggerPayroll(month, year, companyId);
 
     // The actual payroll calculation happens in PayrollController.runPayroll logic usually,
     // but here we are just triggering the external workflow as requested.
@@ -352,21 +352,21 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     };
   }
 
-  private static async dbGenerateHrReport(reportType: 'attendance' | 'payroll' | 'employee') {
-    const employeeCount = await Employee.countDocuments({ status: 'active' });
-    const leaveCount = await Employee.countDocuments({ status: 'on_leave' });
+  private static async dbGenerateHrReport(reportType: 'attendance' | 'payroll' | 'employee', companyId: string) {
+    const employeeCount = await Employee.countDocuments({ companyId, status: 'active' });
+    const leaveCount = await LeaveRequest.countDocuments({ companyId, status: 'approved' });
     
     if (reportType === 'employee') {
       return {
         title: 'Employee Headcount Analysis Report',
         activeEmployees: employeeCount,
-        onLeaveEmployees: leaveCount,
-        summary: `Currently, we have ${employeeCount} active workers with ${leaveCount} individuals registered on leave. All departments are performing within normal structural limits.`
+        approvedLeaveRequests: leaveCount,
+        summary: `Currently, we have ${employeeCount} active workers and ${leaveCount} approved leave requests. All departments are performing within normal structural limits.`
       };
     }
 
     if (reportType === 'payroll') {
-      const payrolls = await Payroll.find();
+      const payrolls = await Payroll.find({ companyId });
       let totalSpending = 0;
       payrolls.forEach(p => totalSpending += p.netSalary);
       return {
@@ -378,9 +378,9 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     }
 
     // Default: Attendance summary
-    const presentCount = await Attendance.countDocuments({ status: 'present' });
-    const lateCount = await Attendance.countDocuments({ status: 'late' });
-    const absentCount = await Attendance.countDocuments({ status: 'absent' });
+    const presentCount = await Attendance.countDocuments({ companyId, status: 'present' });
+    const lateCount = await Attendance.countDocuments({ companyId, status: 'late' });
+    const absentCount = await Attendance.countDocuments({ companyId, status: 'absent' });
     const totalCount = presentCount + lateCount + absentCount || 1;
 
     return {
@@ -396,12 +396,12 @@ Today's date is: ${new Date().toLocaleDateString()}.`
   /**
    * Visual sandbox mock response for users running local setups without active OpenAI credit plans.
    */
-  private static async getMockResponse(question: string): Promise<string> {
+  private static async getMockResponse(question: string, companyId: string): Promise<string> {
     const query = question.toLowerCase();
 
     // Mock query logic checking standard keywords:
     if (query.includes('payroll') && (query.includes('why') || query.includes('higher') || query.includes('compare'))) {
-      const data = await this.dbGetPayrollSummary(5, 2026);
+      const data = await this.dbGetPayrollSummary(5, 2026, companyId);
       return `
 <h3>Payroll Comparison Analysis (May 2026)</h3>
 <p>Our records indicate that payroll for May 2026 is higher than the previous month due to added performance bonuses and tax adjustments.</p>
@@ -442,7 +442,7 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     }
 
     if (query.includes('attendance') || query.includes('absent') || query.includes('late')) {
-      const issues = await this.dbGetAttendanceIssues(5, 2026);
+      const issues = await this.dbGetAttendanceIssues(5, 2026, companyId);
       let issueRows = '';
       if (issues && issues.length > 0) {
         issues.forEach((i: any) => {
@@ -479,7 +479,7 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     }
 
     if (query.includes('underperforming') || query.includes('rating') || query.includes('performance')) {
-      const underperformers = await this.dbGetUnderperformingEmployees();
+      const underperformers = await this.dbGetUnderperformingEmployees(companyId);
       let rows = '';
       if (underperformers && underperformers.length > 0) {
         underperformers.forEach((emp: any) => {
@@ -516,13 +516,13 @@ Today's date is: ${new Date().toLocaleDateString()}.`
     }
 
     if (query.includes('report') || query.includes('generate')) {
-      const rep = await this.dbGenerateHrReport('employee');
+      const rep = await this.dbGenerateHrReport('employee', companyId);
       return `
 <h3>HR Management Analytical Summary</h3>
 <p>Here is a synthesized summary of key operations parameters:</p>
 <ul style="line-height: 1.6;">
   <li><strong>Active Headcount:</strong> ${rep.activeEmployees || 10} Employees</li>
-  <li><strong>On Leave Rate:</strong> ${rep.onLeaveEmployees || 1} currently on registered leaves</li>
+  <li><strong>Approved Leave Requests:</strong> ${rep.approvedLeaveRequests || 0} currently approved</li>
   <li><strong>Operations Payroll Status:</strong> Fully calculated for the current period</li>
 </ul>
 <p><em>Conclusion:</em> The company is currently operating within stable parameters. System triggers for automatic notifications and payslip mailings are working correctly.</p>

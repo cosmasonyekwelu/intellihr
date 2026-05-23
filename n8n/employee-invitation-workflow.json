@@ -1,0 +1,67 @@
+{
+  "name": "IntelliHR Employee Invitation Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "employee-invitation",
+        "responseMode": "responseNode"
+      },
+      "id": "employee-invite-webhook",
+      "name": "Employee Invitation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "people@intellihr.com",
+        "toEmail": "={{$json.email}}",
+        "subject": "You're invited to IntelliHR",
+        "html": "<p>Hello {{$json.name}},</p><p>You have been invited to join {{$json.company}} on IntelliHR.</p><p><a href=\"{{$json.inviteUrl}}\">Complete your employee registration</a></p><p>This invitation expires in 7 days.</p>"
+      },
+      "id": "send-invite-email",
+      "name": "Send Invitation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\":true}"
+      },
+      "id": "invite-response",
+      "name": "Invitation Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Employee Invitation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Invitation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Invitation Email": {
+      "main": [
+        [
+          {
+            "node": "Invitation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

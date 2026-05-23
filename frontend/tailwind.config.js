@@ -9,21 +9,20 @@ export default {
       colors: {
         brand: {
           dark: '#0f172a',
-          glass: 'rgba(30, 41, 59, 0.7)',
-          accent: '#6366f1',
+          accent: '#4f46e5',
           success: '#10b981',
           warning: '#f59e0b',
           danger: '#ef4444',
           info: '#3b82f6',
-          textMuted: '#94a3b8',
-          textActive: '#f8fafc'
+          textMuted: '#64748b',
+          textActive: '#0f172a'
         }
       },
       fontFamily: {
-        sans: ['Outfit', 'Inter', 'sans-serif']
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif']
       },
       boxShadow: {
-        glass: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+        soft: '0 18px 45px -24px rgba(15, 23, 42, 0.35)'
       }
     },
   },

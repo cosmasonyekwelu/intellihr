@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Bot, MessageSquare, Send, Sparkles, X } from 'lucide-react';
+import { Button } from './ui/Button';
 import { api } from '../services/api';
 
 interface Message {
@@ -16,193 +17,140 @@ export const AIWidget: React.FC = () => {
     {
       id: 'welcome',
       sender: 'ai',
-      text: '<h3>Welcome to IntelliHR AI Agent</h3><p>I am your n8n & OpenAI-powered operations assistant. How can I help you automate HR workflows today?</p>',
-      timestamp: new Date(),
-    },
+      text: 'Welcome to IntelliHR Copilot. Ask me about attendance, payroll, leave, or employee operations.',
+      timestamp: new Date()
+    }
   ]);
   const [loading, setLoading] = useState(false);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
   const handleSend = async (textToSend: string) => {
     if (!textToSend.trim() || loading) return;
 
     const userMsg: Message = {
-      id: Math.random().toString(),
+      id: crypto.randomUUID(),
       sender: 'user',
       text: textToSend,
-      timestamp: new Date(),
+      timestamp: new Date()
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((current) => [...current, userMsg]);
     setQuery('');
     setLoading(true);
 
     try {
       const response = await api.ai.ask(textToSend);
-      const aiMsg: Message = {
-        id: Math.random().toString(),
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(),
         sender: 'ai',
         text: response.answer,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+        timestamp: new Date()
+      }]);
     } catch (error: any) {
-      const errorMsg: Message = {
-        id: Math.random().toString(),
+      setMessages((current) => [...current, {
+        id: crypto.randomUUID(),
         sender: 'ai',
-        text: `<p style="color: #ef4444;">I failed to contact the AI Controller: ${error.message || 'Server Offline'}.</p>`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+        text: `I could not reach the AI service: ${error.message || 'Server offline'}.`,
+        timestamp: new Date()
+      }]);
     } finally {
       setLoading(false);
     }
   };
 
   const quickPrompts = [
-    { label: 'Why was payroll higher?', text: 'Why was payroll higher this month?' },
-    { label: 'Attendance Issues', text: 'Summarize attendance issues for this month' },
-    { label: 'Underperforming employees?', text: 'Which employees are underperforming?' },
-    { label: 'Generate HR Report', text: 'Generate HR report for management' },
+    { label: 'Payroll trend', text: 'Why was payroll higher this month?' },
+    { label: 'Attendance', text: 'Summarize attendance issues for this month' },
+    { label: 'Leave queue', text: 'Which leave requests need attention?' }
   ];
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      {/* Floating Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
+    <div className="fixed bottom-5 right-5 z-50">
+      <Button
+        type="button"
+        size="icon"
+        onClick={() => setIsOpen((current) => !current)}
         id="widget_toggle"
-        className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:scale-105 transition-all duration-300 relative group"
+        className="h-14 w-14 rounded-full shadow-lg shadow-indigo-600/25"
+        aria-label="Toggle IntelliHR Copilot"
       >
-        {isOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
-        {!isOpen && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#0f172a] animate-pulse" />
-        )}
-      </button>
+        {isOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
+      </Button>
 
-      {/* Expandable Chat Panel */}
       {isOpen && (
-        <div className="absolute bottom-16 right-0 w-96 max-h-[600px] h-[520px] rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
-          
-          {/* Panel Header */}
-          <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/10">
-              <Bot className="w-5 h-5" />
+        <div className="absolute bottom-16 right-0 flex h-[520px] w-[calc(100vw-2.5rem)] max-w-[400px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-900/20">
+          <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-950 p-4 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500">
+              <Bot className="h-5 w-5" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+            <div className="min-w-0 flex-1">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold">
                 IntelliHR Copilot
-                <Sparkles className="w-3 h-3 text-amber-400 fill-amber-400" />
+                <Sparkles className="h-3.5 w-3.5 text-indigo-200" />
               </h3>
-              <span className="text-[10px] text-emerald-400 font-bold tracking-wider uppercase block">
-                OpenAI GPT-4o-mini
-              </span>
+              <p className="text-xs text-slate-300">Workflow-aware assistant</p>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <X className="w-4 h-4" />
+            <button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white">
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Conversation Area */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/20">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {msg.sender === 'ai' && (
-                  <div className="w-7 h-7 rounded-full bg-indigo-600/10 text-indigo-400 border border-indigo-500/10 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
-                    AI
-                  </div>
-                )}
-                
-                <div
-                  className={`max-w-[75%] rounded-2xl p-3.5 text-xs leading-relaxed ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-600/10'
-                      : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/50'
-                  }`}
-                >
-                  <div 
-                    className="space-y-2 ai-message-body"
-                    dangerouslySetInnerHTML={{ __html: msg.text }} 
-                  />
-                  <span className="text-[8px] opacity-40 mt-1.5 block text-right">
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[82%] rounded-lg px-3 py-2 text-sm leading-6 ${
+                  message.sender === 'user'
+                    ? 'bg-indigo-600 text-white'
+                    : 'border border-slate-200 bg-white text-slate-700 shadow-sm'
+                }`}>
+                  <div dangerouslySetInnerHTML={{ __html: message.text }} />
+                  <span className="mt-1 block text-right text-[10px] opacity-60">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
             ))}
-            
-            {loading && (
-              <div className="flex gap-2.5 justify-start">
-                <div className="w-7 h-7 rounded-full bg-indigo-600/10 text-indigo-400 border border-indigo-500/10 flex items-center justify-center flex-shrink-0 text-[10px] font-bold animate-pulse">
-                  AI
-                </div>
-                <div className="max-w-[75%] rounded-2xl p-3.5 text-xs bg-slate-800 text-slate-400 rounded-tl-none border border-slate-700/50 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  <span className="ml-1 text-[10px] italic">Copilot querying database...</span>
-                </div>
-              </div>
-            )}
-            
+            {loading && <div className="text-sm font-medium text-slate-500">Copilot is thinking...</div>}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Prompts list (visible when idle) */}
-          {!loading && (
-            <div className="p-3 bg-slate-900 border-t border-slate-800 flex gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none">
-              {quickPrompts.map((p) => (
+          <div className="border-t border-slate-200 bg-white p-3">
+            <div className="mb-3 flex gap-2 overflow-x-auto">
+              {quickPrompts.map((prompt) => (
                 <button
-                  key={p.label}
-                  onClick={() => handleSend(p.text)}
-                  className="px-2.5 py-1.5 rounded-full bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-[10px] font-semibold text-indigo-400 transition-colors"
+                  key={prompt.label}
+                  type="button"
+                  onClick={() => handleSend(prompt.text)}
+                  className="whitespace-nowrap rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
-                  {p.label}
+                  {prompt.label}
                 </button>
               ))}
             </div>
-          )}
-
-          {/* Input field */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend(query);
-            }}
-            className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
-          >
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question..."
-              id="ai_chat_input"
-              className="flex-1 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs text-white placeholder-slate-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!query.trim() || loading}
-              className="w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white flex items-center justify-center transition-colors"
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleSend(query);
+              }}
+              className="flex items-center gap-2"
             >
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </form>
-
+              <input
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Ask a question..."
+                id="ai_chat_input"
+                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+              />
+              <Button type="submit" size="icon" disabled={!query.trim() || loading} aria-label="Send message">
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
         </div>
       )}
     </div>
