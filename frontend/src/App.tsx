@@ -6,6 +6,7 @@ import { AIWidget } from './components/AIWidget';
 import { PrivateRoute } from './components/PrivateRoute';
 
 // Page Imports
+import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Employees } from './pages/Employees';
@@ -52,12 +53,15 @@ export const App: React.FC = () => {
     <Router>
       <Routes>
         
+        {/* Public Landing Page */}
+        <Route path="/" element={<Landing />} />
+
         {/* Authentication landing page */}
         <Route path="/login" element={<Login />} />
 
         {/* Console protected areas */}
         <Route 
-          path="/" 
+          path="/dashboard"
           element={
             <PrivateRoute>
               <Layout>

@@ -26,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // Serve Generated Payslips Statically
 const publicDir = path.join(__dirname, '..', 'public');
 app.use('/payslips', express.static(path.join(publicDir, 'payslips')));
+app.use('/uploads', express.static(path.join(publicDir, 'uploads')));
 
 // Register Routes
 app.use('/api/auth', authRoutes);

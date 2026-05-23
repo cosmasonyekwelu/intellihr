@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { Employee } from '../models/Employee';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { N8nService } from '../services/n8nService';
+import PDFDocument from 'pdfkit';
 
 export class EmployeeController {
   static async getEmployees(req: AuthenticatedRequest, res: Response) {
@@ -93,6 +94,8 @@ export class EmployeeController {
         return res.status(400).json({ message: 'Employee with this email already exists' });
       }
 
+      const photoUrl = req.file ? `/uploads/${req.file.filename}` : '';
+
       const newEmployee = await Employee.create({
         name,
         email,
@@ -102,7 +105,8 @@ export class EmployeeController {
         salary,
         hireDate: hireDate || new Date(),
         status: status || 'active',
-        performanceRating: performanceRating || 3
+        performanceRating: performanceRating || 3,
+        photoUrl
       });
 
       // Post asynchronous webhook alerts to Slack channel using n8n integration
@@ -122,8 +126,13 @@ export class EmployeeController {
   static async updateEmployee(req: AuthenticatedRequest, res: Response) {
     try {
       const { id } = req.params;
+      const updateData = { ...req.body };
 
-      const employee = await Employee.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+      if (req.file) {
+        updateData.photoUrl = `/uploads/${req.file.filename}`;
+      }
+
+      const employee = await Employee.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
       if (!employee) {
         return res.status(404).json({ message: 'Employee not found' });
       }
@@ -151,6 +160,94 @@ export class EmployeeController {
       res.json({ message: 'Employee deleted successfully' });
     } catch (error: any) {
       res.status(500).json({ message: 'Error deleting employee', error: error.message });
+    }
+  }
+
+  static async generateOfferLetter(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const employee = await Employee.findById(id);
+
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      const doc = new PDFDocument({ margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=offer_letter_${employee.name.replace(/\s+/g, '_')}.pdf`);
+
+      doc.pipe(res);
+
+      doc.fillColor('#1e293b').fontSize(24).text('OFFER OF EMPLOYMENT', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(10).fillColor('#64748b').text(`Date: ${new Date().toLocaleDateString()}`, { align: 'right' });
+      doc.moveDown(2);
+
+      doc.fillColor('#0f172a').fontSize(12).text(`Dear ${employee.name},`);
+      doc.moveDown();
+      doc.fontSize(10).fillColor('#334155').text(
+        `We are pleased to offer you the position of ${employee.position} at IntelliHR. ` +
+        `We were impressed with your background and believe you will be a valuable asset to our ${employee.department} department.`
+      );
+      doc.moveDown();
+      doc.text(`Starting Monthly Salary: $${employee.salary.toLocaleString()}`);
+      doc.text(`Start Date: ${employee.hireDate.toLocaleDateString()}`);
+      doc.moveDown(2);
+      doc.text('We look forward to welcoming you to the team!');
+      doc.moveDown(4);
+      doc.text('Sincerely,');
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('IntelliHR Management');
+
+      doc.end();
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error generating offer letter', error: error.message });
+    }
+  }
+
+  static async generateContract(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const employee = await Employee.findById(id);
+
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      const doc = new PDFDocument({ margin: 50 });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=contract_${employee.name.replace(/\s+/g, '_')}.pdf`);
+
+      doc.pipe(res);
+
+      doc.fillColor('#1e293b').fontSize(24).text('EMPLOYMENT CONTRACT', { align: 'center' });
+      doc.moveDown();
+      doc.strokeColor('#cbd5e1').lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(2);
+
+      doc.fontSize(10).fillColor('#334155').text(
+        `This agreement is made between IntelliHR and ${employee.name} for the position of ${employee.position}.`
+      );
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('1. Compensation');
+      doc.font('Helvetica').text(`The employee will receive a monthly salary of $${employee.salary.toLocaleString()}, subject to standard deductions.`);
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('2. Duties');
+      doc.font('Helvetica').text(`The employee shall perform duties associated with the role of ${employee.position} within the ${employee.department} department.`);
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('3. Termination');
+      doc.font('Helvetica').text('Either party may terminate this agreement with proper notice as per company policy.');
+      doc.moveDown(4);
+
+      doc.text('__________________________', 50, doc.y);
+      doc.text('Employer Signature', 50, doc.y + 15);
+
+      doc.text('__________________________', 350, doc.y - 15);
+      doc.text('Employee Signature', 350, doc.y);
+
+      doc.end();
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error generating contract', error: error.message });
     }
   }
 }

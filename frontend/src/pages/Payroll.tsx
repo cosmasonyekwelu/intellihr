@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  CircleDollarSign, 
   Settings, 
   Download, 
   HelpCircle,
-  Play,
-  TrendingUp,
-  AlertCircle
+  Play
 } from 'lucide-react';
 import { api } from '../services/api';
 

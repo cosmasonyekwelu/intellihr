@@ -14,7 +14,8 @@ const employeeSchema = new Schema(
       enum: ['active', 'on_leave', 'terminated'],
       default: 'active'
     },
-    performanceRating: { type: Number, min: 1, max: 5, default: 3 }
+    performanceRating: { type: Number, min: 1, max: 5, default: 3 },
+    photoUrl: { type: String, default: '' }
   },
   { timestamps: true }
 );

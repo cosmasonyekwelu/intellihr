@@ -2,7 +2,10 @@ import OpenAI from 'openai';
 import { Employee } from '../models/Employee';
 import { Attendance } from '../models/Attendance';
 import { Payroll } from '../models/Payroll';
+import { LeaveRequest } from '../models/LeaveRequest';
 import { Conversation } from '../models/Conversation';
+import { N8nService } from './n8nService';
+import { NotificationService } from './notificationService';
 
 // Set up OpenAI instance (only if API key is provided)
 const apiKey = process.env.OPENAI_API_KEY;
@@ -68,6 +71,46 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         properties: {}
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_pending_leave_requests',
+      description: 'List all pending leave requests that require approval',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'approve_leave_request',
+      description: 'Approve a pending leave request',
+      parameters: {
+        type: 'object',
+        properties: {
+          requestId: { type: 'string', description: 'The unique ID of the leave request' }
+        },
+        required: ['requestId']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'trigger_payroll_run',
+      description: 'Trigger the monthly payroll calculation and payslip generation cycle',
+      parameters: {
+        type: 'object',
+        properties: {
+          month: { type: 'integer', description: 'Month to run (1-12)' },
+          year: { type: 'integer', description: 'Year to run' }
+        },
+        required: ['month', 'year']
+      }
+    }
   }
 ];
 
@@ -126,6 +169,12 @@ Today's date is: ${new Date().toLocaleDateString()}.`
             functionResult = await this.dbGenerateHrReport(args.reportType);
           } else if (functionName === 'get_underperforming_employees') {
             functionResult = await this.dbGetUnderperformingEmployees();
+          } else if (functionName === 'get_pending_leave_requests') {
+            functionResult = await this.dbGetPendingLeaveRequests();
+          } else if (functionName === 'approve_leave_request') {
+            functionResult = await this.dbApproveLeaveRequest(args.requestId);
+          } else if (functionName === 'trigger_payroll_run') {
+            functionResult = await this.dbTriggerPayroll(args.month, args.year);
           }
 
           // Push the tool result back into the OpenAI messages chain
@@ -246,6 +295,61 @@ Today's date is: ${new Date().toLocaleDateString()}.`
       salary: emp.salary,
       rating: emp.performanceRating
     }));
+  }
+
+  private static async dbGetPendingLeaveRequests() {
+    const requests = await LeaveRequest.find({ status: 'pending' }).populate('employeeId', 'name position department');
+    return requests.map(r => ({
+      requestId: r._id,
+      employeeName: (r.employeeId as any)?.name || 'Unknown',
+      type: r.type,
+      startDate: r.startDate.toLocaleDateString(),
+      endDate: r.endDate.toLocaleDateString(),
+      reason: r.reason
+    }));
+  }
+
+  private static async dbApproveLeaveRequest(requestId: string) {
+    const request = await LeaveRequest.findById(requestId).populate('employeeId');
+    if (!request) {
+      return { success: false, message: 'Leave request not found.' };
+    }
+
+    if (request.status !== 'pending') {
+      return { success: false, message: `Request is already ${request.status}.` };
+    }
+
+    request.status = 'approved';
+    await request.save();
+
+    // Update employee status
+    await Employee.findByIdAndUpdate(request.employeeId, { status: 'on_leave' });
+
+    // Notify employee
+    const emp = request.employeeId as any;
+    if (emp && emp.email) {
+      await NotificationService.sendEmail(
+        emp.email,
+        'Leave Request Approved',
+        `<p>Your leave request from ${request.startDate.toLocaleDateString()} to ${request.endDate.toLocaleDateString()} has been approved.</p>`
+      );
+    }
+
+    return { success: true, message: `Leave request for ${emp?.name} has been approved successfully.` };
+  }
+
+  private static async dbTriggerPayroll(month: number, year: number) {
+    // Trigger n8n workflow
+    const n8nResult = await N8nService.triggerPayroll(month, year);
+
+    // The actual payroll calculation happens in PayrollController.runPayroll logic usually,
+    // but here we are just triggering the external workflow as requested.
+
+    return {
+      success: true,
+      message: `Payroll run for ${month}/${year} has been initiated via n8n.`,
+      n8nResponse: n8nResult
+    };
   }
 
   private static async dbGenerateHrReport(reportType: 'attendance' | 'payroll' | 'employee') {
