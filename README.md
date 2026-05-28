@@ -227,6 +227,28 @@ npm run build
 - Run `npm run build` in both apps before release.
 - Do not deploy local `.env` files.
 
+## Render Deployment
+
+This repo includes `render.yaml` for Blueprint deploys. If configuring services manually, use these settings.
+
+Backend web service:
+
+- Root directory: `backend`
+- Build command: `npm ci --include=dev && npm run build`
+- Start command: `npm start`
+- Required env vars: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGIN`
+
+Frontend static site:
+
+- Root directory: `frontend`
+- Service type: Static Site, or Blueprint `type: web` with `runtime: static`
+- Build command: `npm ci --include=dev && npm run build`
+- Publish directory: `dist`
+- Env var: `VITE_API_URL=https://your-backend-domain.onrender.com/api`
+- Rewrite rule: `/* -> /index.html`
+
+The `--include=dev` flag matters because TypeScript, Vite, and `@types/*` packages are build-time dependencies.
+
 ## Testing Notes
 
 The TypeScript builds are the primary verification path currently. The backend test script expects Jest from `backend/node_modules`; run `npm install` in `backend/` before `npm test`.
