@@ -22,7 +22,10 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
   }
 
   const token = authHeader.split(' ')[1];
-  const secret = process.env.JWT_SECRET || 'intellihr_default_jwt_secret_key_12345';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ message: 'Server authentication is not configured' });
+  }
 
   jwt.verify(token, secret, (err, decoded: any) => {
     if (err) {

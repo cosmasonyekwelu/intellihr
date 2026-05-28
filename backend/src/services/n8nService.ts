@@ -1,92 +1,101 @@
 import axios from 'axios';
 
-export class N8nService {
+type WebhookPayload = Record<string, any>;
+
+export class N8nWebhookService {
   private static getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.N8N_API_KEY || 'intellihr_static_n8n_api_key_secure_123'
-    };
+    return { 'Content-Type': 'application/json' };
   }
 
-  /**
-   * Calls n8n monthly payroll webhook
-   */
+  private static getWebhookUrl(envKey: string, path: string) {
+    const explicitUrl = process.env[envKey];
+    if (explicitUrl) return explicitUrl;
+
+    const baseUrl = process.env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678/webhook';
+    return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  }
+
+  private static withSecret(payload: WebhookPayload) {
+    const secret = process.env.N8N_WEBHOOK_SECRET;
+    return secret ? { secret, ...payload } : payload;
+  }
+
+  private static async postWebhook(envKey: string, path: string, payload: WebhookPayload, label: string) {
+    const url = this.getWebhookUrl(envKey, path);
+    console.log(`[n8n Webhook] Triggering ${label}: POST ${url}`);
+
+    try {
+      const response = await axios.post(url, this.withSecret(payload), { headers: this.getHeaders() });
+      console.log(`[n8n Webhook] ${label} response code: ${response.status}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[n8n Webhook] ${label} failed:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
   static async triggerPayroll(month: number, year: number, companyId: string, records: any[] = []): Promise<any> {
-    const url = process.env.N8N_PAYROLL_WEBHOOK_URL || 'http://localhost:5678/webhook/payroll';
-    console.log(`[n8n Service] Triggering Payroll workflow: POST ${url} with month=${month}, year=${year}`);
-    
-    try {
-      const response = await axios.post(url, { month, year, companyId, records }, { headers: this.getHeaders() });
-      console.log(`[n8n Service] Webhook response code: ${response.status}`);
-      return response.data;
-    } catch (error: any) {
-      console.error(`[n8n Service] Error calling payroll webhook:`, error.message);
-      // We will handle errors by returning a fallback response to keep the backend resilient
-      return { success: false, error: error.message };
-    }
+    return this.postWebhook(
+      'N8N_PAYROLL_WEBHOOK_URL',
+      'payroll-trigger',
+      { month, year, companyId, records },
+      'Payroll'
+    );
   }
 
-  /**
-   * Calls n8n Slack webhook alert when a new employee is hired
-   */
   static async triggerSlackNewEmployee(employeeData: any): Promise<any> {
-    const url = process.env.N8N_SLACK_WEBHOOK_URL || 'http://localhost:5678/webhook/slack-alerts';
-    console.log(`[n8n Service] Triggering Slack Alert workflow: POST ${url}`);
-    
-    try {
-      const response = await axios.post(url, { employee: employeeData }, { headers: this.getHeaders() });
-      return response.data;
-    } catch (error: any) {
-      console.error(`[n8n Service] Error calling slack webhook:`, error.message);
-      return { success: false, error: error.message };
-    }
+    return this.postWebhook(
+      'N8N_SLACK_WEBHOOK_URL',
+      'slack-alerts',
+      { employee: employeeData },
+      'Slack New Employee Alert'
+    );
   }
 
-  /**
-   * Trigger the daily HR leave email digest manually or in cron
-   */
-  static async triggerEmailDigest(): Promise<any> {
-    const url = process.env.N8N_EMAIL_DIGEST_WEBHOOK_URL || 'http://localhost:5678/webhook/email-digest';
-    console.log(`[n8n Service] Triggering Leave Email Digest workflow: POST ${url}`);
-
-    try {
-      const response = await axios.post(url, {}, { headers: this.getHeaders() });
-      return response.data;
-    } catch (error: any) {
-      console.error(`[n8n Service] Error calling leave email digest webhook:`, error.message);
-      return { success: false, error: error.message };
-    }
+  static async triggerEmailDigest(payload: WebhookPayload = {}): Promise<any> {
+    return this.postWebhook(
+      'N8N_EMAIL_DIGEST_WEBHOOK_URL',
+      'email-digest',
+      payload,
+      'Leave Email Digest'
+    );
   }
 
-  /**
-   * Trigger password reset email workflow without blocking the auth response.
-   */
   static async triggerPasswordReset(payload: { email: string; name?: string; resetToken: string; resetUrl: string }): Promise<any> {
-    const url = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL || 'http://localhost:5678/webhook/password-reset';
-    console.log(`[n8n Service] Triggering Password Reset workflow: POST ${url}`);
-
-    try {
-      const response = await axios.post(url, payload, { headers: this.getHeaders() });
-      return response.data;
-    } catch (error: any) {
-      console.error(`[n8n Service] Error calling password reset webhook:`, error.message);
-      return { success: false, error: error.message };
-    }
+    return this.postWebhook(
+      'N8N_PASSWORD_RESET_WEBHOOK_URL',
+      'password-reset',
+      payload,
+      'Password Reset Email'
+    );
   }
 
-  /**
-   * Trigger employee invitation email workflow.
-   */
   static async triggerEmployeeInvitation(payload: { email: string; name: string; company: string; inviteUrl: string }): Promise<any> {
-    const url = process.env.N8N_EMPLOYEE_INVITE_WEBHOOK_URL || 'http://localhost:5678/webhook/employee-invitation';
-    console.log(`[n8n Service] Triggering Employee Invitation workflow: POST ${url}`);
+    return this.postWebhook(
+      'N8N_EMPLOYEE_INVITE_WEBHOOK_URL',
+      'invite-employee',
+      payload,
+      'Employee Invitation Email'
+    );
+  }
 
-    try {
-      const response = await axios.post(url, payload, { headers: this.getHeaders() });
-      return response.data;
-    } catch (error: any) {
-      console.error(`[n8n Service] Error calling employee invitation webhook:`, error.message);
-      return { success: false, error: error.message };
-    }
+  static async triggerAttendanceReminder(payload: WebhookPayload): Promise<any> {
+    return this.postWebhook(
+      'N8N_ATTENDANCE_REMINDER_WEBHOOK_URL',
+      'attendance-reminder',
+      payload,
+      'Attendance Reminder'
+    );
+  }
+
+  static async triggerLeaveNotification(payload: WebhookPayload): Promise<any> {
+    return this.postWebhook(
+      'N8N_LEAVE_NOTIFICATION_WEBHOOK_URL',
+      'leave-notification',
+      payload,
+      'Leave Request Notification'
+    );
   }
 }
+
+export const N8nService = N8nWebhookService;

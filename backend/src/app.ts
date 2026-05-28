@@ -19,9 +19,35 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (isProduction) {
+  ['JWT_SECRET', 'MONGODB_URI', 'FRONTEND_URL'].forEach((key) => {
+    if (!process.env[key]) {
+      throw new Error(`${key} is required in production`);
+    }
+  });
+
+  if (allowedOrigins.length === 0) {
+    throw new Error('CORS_ORIGIN or FRONTEND_URL is required in production');
+  }
+}
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -52,7 +78,7 @@ app.get('/', (req, res) => {
 // Database Connection & Server Startup
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/intellihr';
 
-console.log(`[Database] Attempting connection to MongoDB at: ${MONGODB_URI}`);
+console.log('[Database] Attempting connection to MongoDB.');
 mongoose
   .connect(MONGODB_URI)
   .then(() => {
@@ -63,10 +89,5 @@ mongoose
   })
   .catch((err) => {
     console.error('[Database] Connection Error:', err.message);
-    console.log('[Fallback] Starting Express Server with mocked database status.');
-    
-    // Start server even if MongoDB is offline to keep development feedback responsive
-    app.listen(PORT, () => {
-      console.log(`[Server] IntelliHR server running in fallback mode on http://localhost:${PORT}`);
-    });
+    process.exit(1);
   });

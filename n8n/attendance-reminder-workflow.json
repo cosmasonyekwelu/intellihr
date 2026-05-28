@@ -3,19 +3,14 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 18 * * 1-5"
-            }
-          ]
-        }
+        "httpMethod": "POST",
+        "path": "attendance-reminder",
+        "responseMode": "responseNode"
       },
-      "id": "attendance-reminder-schedule",
-      "name": "Daily 6pm Reminder",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "id": "attendance-reminder-webhook",
+      "name": "Attendance Reminder Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [240, 300]
     },
     {
@@ -63,7 +58,7 @@
     }
   ],
   "connections": {
-    "Daily 6pm Reminder": {
+    "Attendance Reminder Webhook": {
       "main": [
         [
           {

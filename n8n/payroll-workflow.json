@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "payroll-webhook",
+        "path": "payroll-trigger",
         "options": {}
       },
       "id": "e2f7b036-7c9c-4613-8d09-b47209772d1a",

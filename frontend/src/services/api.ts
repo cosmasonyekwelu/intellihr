@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Base API URI (proxied through Vite, but explicit during fallback)
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -34,10 +33,6 @@ export const api = {
     },
     signup: async (data: any) => {
       const response = await apiClient.post('/auth/signup', data);
-      return response.data;
-    },
-    register: async (data: any) => {
-      const response = await apiClient.post('/auth/register', data);
       return response.data;
     },
     getMe: async () => {

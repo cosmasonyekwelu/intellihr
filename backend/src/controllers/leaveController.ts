@@ -2,7 +2,9 @@ import { Response } from 'express';
 import { LeaveRequest } from '../models/LeaveRequest';
 import { LeaveType } from '../models/LeaveType';
 import { Employee } from '../models/Employee';
+import { User } from '../models/User';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { N8nService } from '../services/n8nService';
 
 const countDays = (startDate: Date, endDate: Date) => {
   const msPerDay = 1000 * 60 * 60 * 24;
@@ -60,6 +62,26 @@ export class LeaveController {
         status: leaveType.requiresApproval ? 'pending' : 'approved',
         approvedBy: leaveType.requiresApproval ? null : req.user?.id
       });
+
+      if (leaveType.requiresApproval) {
+        const employee = await Employee.findOne({ _id: employeeId, companyId }).select('name email department position');
+        const hrUsers = await User.find({ companyId, role: 'hr', isActive: true }).select('email name');
+
+        N8nService.triggerLeaveNotification({
+          companyId,
+          requestId: request._id,
+          employeeId,
+          employeeName: employee?.name || req.user?.name,
+          employeeEmail: employee?.email || req.user?.email,
+          leaveType: leaveType.name,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          reason,
+          hrEmails: hrUsers.map((user) => user.email)
+        }).catch((error) => {
+          console.error('[Leave] Failed to trigger leave notification webhook:', error.message);
+        });
+      }
 
       res.status(201).json({ message: 'Leave request submitted successfully', request });
     } catch (error: any) {

@@ -1,0 +1,88 @@
+{
+  "name": "IntelliHR Leave Request Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leave-notification",
+        "responseMode": "responseNode"
+      },
+      "id": "leave-notification-webhook",
+      "name": "Leave Notification Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = items[0].json.body || items[0].json;\nconst hrEmails = body.hrEmails || [];\nif (!body.companyId || !body.requestId) {\n  throw new Error('companyId and requestId are required');\n}\nreturn hrEmails.map((email) => ({\n  json: {\n    ...body,\n    hrEmail: email,\n    approveUrl: `/api/leave/${body.requestId}/approve`,\n    rejectUrl: `/api/leave/${body.requestId}/reject`\n  }\n}));"
+      },
+      "id": "format-leave-notification",
+      "name": "Format Leave Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "people@intellihr.com",
+        "toEmail": "={{$json.hrEmail}}",
+        "subject": "=New leave request from {{$json.employeeName}}",
+        "html": "<p>New leave request from <strong>{{$json.employeeName}}</strong>.</p><p>Type: {{$json.leaveType}}</p><p>Dates: {{$json.startDate}} to {{$json.endDate}}</p><p>Reason: {{$json.reason}}</p><p>Approve: {{$json.approveUrl}}<br/>Reject: {{$json.rejectUrl}}</p>"
+      },
+      "id": "send-leave-email",
+      "name": "Send Leave Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\":true}"
+      },
+      "id": "leave-notification-response",
+      "name": "Leave Notification Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 300]
+    }
+  ],
+  "connections": {
+    "Leave Notification Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Leave Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Leave Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Leave Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Leave Email": {
+      "main": [
+        [
+          {
+            "node": "Leave Notification Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

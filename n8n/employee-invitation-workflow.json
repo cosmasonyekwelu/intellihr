@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "employee-invitation",
+        "path": "invite-employee",
         "responseMode": "responseNode"
       },
       "id": "employee-invite-webhook",
@@ -16,9 +16,9 @@
     {
       "parameters": {
         "fromEmail": "people@intellihr.com",
-        "toEmail": "={{$json.email}}",
+        "toEmail": "={{$json.body?.email || $json.email}}",
         "subject": "You're invited to IntelliHR",
-        "html": "<p>Hello {{$json.name}},</p><p>You have been invited to join {{$json.company}} on IntelliHR.</p><p><a href=\"{{$json.inviteUrl}}\">Complete your employee registration</a></p><p>This invitation expires in 7 days.</p>"
+        "html": "<p>Hello {{$json.body?.name || $json.name}},</p><p>You have been invited to join {{$json.body?.company || $json.company}} on IntelliHR.</p><p><a href=\"{{$json.body?.inviteUrl || $json.inviteUrl}}\">Complete your employee registration</a></p><p>This invitation expires in 7 days.</p>"
       },
       "id": "send-invite-email",
       "name": "Send Invitation Email",

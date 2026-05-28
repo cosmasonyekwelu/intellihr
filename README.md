@@ -37,18 +37,22 @@ Create `backend/.env` from `backend/.env.example`.
 
 ```env
 PORT=5000
+NODE_ENV=development
 MONGODB_URI=mongodb://127.0.0.1:27017/intellihr
 JWT_SECRET=replace_with_a_strong_jwt_secret
 OPENAI_API_KEY=your_openai_api_key_here
 FRONTEND_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3000
 
-N8N_API_KEY=replace_with_your_n8n_api_key
 N8N_WEBHOOK_BASE_URL=http://localhost:5678/webhook
-N8N_PAYROLL_WEBHOOK_URL=http://localhost:5678/webhook/payroll
-N8N_EMPLOYEE_INVITE_WEBHOOK_URL=http://localhost:5678/webhook/employee-invitation
+N8N_WEBHOOK_SECRET=replace_with_optional_shared_webhook_secret
+N8N_PAYROLL_WEBHOOK_URL=http://localhost:5678/webhook/payroll-trigger
+N8N_EMPLOYEE_INVITE_WEBHOOK_URL=http://localhost:5678/webhook/invite-employee
 N8N_PASSWORD_RESET_WEBHOOK_URL=http://localhost:5678/webhook/password-reset
 N8N_ATTENDANCE_REMINDER_WEBHOOK_URL=http://localhost:5678/webhook/attendance-reminder
 N8N_EMAIL_DIGEST_WEBHOOK_URL=http://localhost:5678/webhook/email-digest
+N8N_LEAVE_NOTIFICATION_WEBHOOK_URL=http://localhost:5678/webhook/leave-notification
+N8N_SLACK_WEBHOOK_URL=http://localhost:5678/webhook/slack-alerts
 
 GMAIL_USER=
 GMAIL_PASS=
@@ -57,6 +61,14 @@ TWILIO_AUTH_TOKEN=
 TWILIO_WHATSAPP_NUMBER=
 SLACK_INCOMING_WEBHOOK_URL=
 ```
+
+For a separate deployed frontend, set `frontend/.env`:
+
+```env
+VITE_API_URL=https://your-api-domain.com/api
+```
+
+For a same-origin deployment, keep `VITE_API_URL=/api`.
 
 ## Run Locally
 
@@ -167,9 +179,24 @@ Import workflow templates from `n8n/`:
 - `password-reset-workflow.json`
 - `payroll-workflow.json`
 - `attendance-reminder-workflow.json`
+- `leave-notification-workflow.json`
 - `email-digest-workflow.json`
 - `slack-alerts-workflow.json`
 - `whatsapp-agent-workflow.json`
+
+IntelliHR triggers n8n through workflow webhooks only. 
+
+Recommended webhook paths:
+
+- Payroll processing: `/payroll-trigger`
+- Employee invitation: `/invite-employee`
+- Password reset: `/password-reset`
+- Attendance reminder: `/attendance-reminder`
+- Leave request notification: `/leave-notification`
+- Leave digest: `/email-digest`
+- Slack new employee alert: `/slack-alerts`
+
+If `N8N_WEBHOOK_SECRET` is set, the backend includes it in the webhook JSON body as `secret`. Add an IF node after each n8n Webhook node to compare that value before continuing.
 
 The payroll and digest workflows expect tenant-scoped payloads from the backend. Do not configure n8n workflows to fetch global employee or leave data.
 
@@ -189,6 +216,17 @@ cd frontend
 npm run build
 ```
 
+## Deployment Checklist
+
+- Set `NODE_ENV=production` for the backend.
+- Set `JWT_SECRET`, `MONGODB_URI`, `FRONTEND_URL`, and `CORS_ORIGIN`; the backend refuses to start in production without them.
+- Set `VITE_API_URL` in the frontend if the API is hosted on a different domain.
+- Configure n8n webhook URLs for invitation emails, password reset emails, payroll, leave notifications, attendance reminders, and digests.
+- Do not set or rely on `N8N_API_KEY`; IntelliHR uses webhook triggers, not the n8n REST API.
+- Run `npm ci` in both `backend/` and `frontend/` during deployment.
+- Run `npm run build` in both apps before release.
+- Do not deploy local `.env` files.
+
 ## Testing Notes
 
 The TypeScript builds are the primary verification path currently. The backend test script expects Jest from `backend/node_modules`; run `npm install` in `backend/` before `npm test`.
@@ -196,7 +234,7 @@ The TypeScript builds are the primary verification path currently. The backend t
 ## Security Notes
 
 - Use a strong `JWT_SECRET` in every environment.
-- Keep `OPENAI_API_KEY` and n8n credentials out of source control.
+- Keep `OPENAI_API_KEY` and webhook secrets out of source control.
 - Do not add seed users or shared demo accounts.
 - Do not introduce an `admin` role.
 - Keep all tenant-owned database reads and writes scoped by `companyId`.

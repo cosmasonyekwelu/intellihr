@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "slack-alert-webhook",
+        "path": "slack-alerts",
         "options": {}
       },
       "id": "s1f7b036-7c9c-4613-8d09-b47209772d1a",

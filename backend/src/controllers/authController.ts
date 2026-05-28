@@ -28,7 +28,10 @@ export class AuthController {
   }
 
   private static buildToken(user: any) {
-    const secret = process.env.JWT_SECRET || 'intellihr_default_jwt_secret_key_12345';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET is required');
+    }
 
     return jwt.sign(
       {
