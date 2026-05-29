@@ -37,6 +37,16 @@ if (isProduction) {
   }
 }
 
+const describeMongoUri = (uri: string) => {
+  try {
+    const parsed = new URL(uri);
+    const database = parsed.pathname?.replace('/', '') || '(no database name)';
+    return `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}/${database}`;
+  } catch {
+    return '(invalid MongoDB URI format)';
+  }
+};
+
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
@@ -79,6 +89,7 @@ app.get('/', (req, res) => {
 const MONGODB_URI = process.env.MONGODB_URI;
 
 console.log('[Database] Attempting connection to MongoDB.');
+console.log(`[Database] Target: ${describeMongoUri(MONGODB_URI as string)}`);
 mongoose
   .connect(MONGODB_URI as string, {
     serverSelectionTimeoutMS: 10000
@@ -90,8 +101,8 @@ mongoose
     });
   })
   .catch((err) => {
-    console.error('[Database] Connection Error:', err.name || 'MongoConnectionError');
-    console.error('[Database] Details:', err.message);
-    console.error('[Database] Check MONGODB_URI, Atlas network access, database user credentials, and URL-encoded password characters.');
-    process.exit(1);
+    console.log('[Database] Connection Error:', err.name || 'MongoConnectionError');
+    console.log('[Database] Details:', err.message);
+    console.log('[Database] Check MONGODB_URI, Atlas network access, database user credentials, and URL-encoded password characters.');
+    setTimeout(() => process.exit(1), 500);
   });
