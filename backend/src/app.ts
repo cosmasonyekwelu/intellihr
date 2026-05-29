@@ -37,6 +37,10 @@ if (isProduction) {
   }
 }
 
+const writeStartupLog = (message: string) => {
+  process.stdout.write(`${message}\n`);
+};
+
 const describeMongoUri = (uri: string) => {
   try {
     const parsed = new URL(uri);
@@ -46,6 +50,18 @@ const describeMongoUri = (uri: string) => {
     return '(invalid MongoDB URI format)';
   }
 };
+
+const getMongoDatabaseName = (uri: string) => {
+  try {
+    return new URL(uri).pathname.replace('/', '').trim();
+  } catch {
+    return '';
+  }
+};
+
+if (isProduction && !getMongoDatabaseName(process.env.MONGODB_URI as string)) {
+  throw new Error('MONGODB_URI must include a database name, for example mongodb+srv://USER:PASSWORD@cluster.mongodb.net/intellihr?retryWrites=true&w=majority');
+}
 
 // Middleware
 app.use(cors({
@@ -88,21 +104,22 @@ app.get('/', (req, res) => {
 // Database Connection & Server Startup
 const MONGODB_URI = process.env.MONGODB_URI;
 
-console.log('[Database] Attempting connection to MongoDB.');
-console.log(`[Database] Target: ${describeMongoUri(MONGODB_URI as string)}`);
+writeStartupLog('[Database] Attempting connection to MongoDB.');
+writeStartupLog(`[Database] Target: ${describeMongoUri(MONGODB_URI as string)}`);
 mongoose
   .connect(MONGODB_URI as string, {
-    serverSelectionTimeoutMS: 10000
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000
   })
   .then(() => {
-    console.log('[Database] MongoDB Connected Successfully.');
+    writeStartupLog('[Database] MongoDB Connected Successfully.');
     app.listen(PORT, () => {
-      console.log(`[Server] IntelliHR backend running on http://localhost:${PORT}`);
+      writeStartupLog(`[Server] IntelliHR backend running on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.log('[Database] Connection Error:', err.name || 'MongoConnectionError');
-    console.log('[Database] Details:', err.message);
-    console.log('[Database] Check MONGODB_URI, Atlas network access, database user credentials, and URL-encoded password characters.');
-    setTimeout(() => process.exit(1), 500);
+    writeStartupLog(`[Database] Connection Error: ${err.name || 'MongoConnectionError'}`);
+    writeStartupLog(`[Database] Details: ${err.message}`);
+    writeStartupLog('[Database] Check MONGODB_URI, Atlas Network Access, database user credentials, and URL-encoded password characters.');
+    setTimeout(() => process.exit(1), 3000);
   });
