@@ -76,11 +76,13 @@ app.get('/', (req, res) => {
 });
 
 // Database Connection & Server Startup
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/intellihr';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 console.log('[Database] Attempting connection to MongoDB.');
 mongoose
-  .connect(MONGODB_URI)
+  .connect(MONGODB_URI as string, {
+    serverSelectionTimeoutMS: 10000
+  })
   .then(() => {
     console.log('[Database] MongoDB Connected Successfully.');
     app.listen(PORT, () => {
@@ -88,6 +90,8 @@ mongoose
     });
   })
   .catch((err) => {
-    console.error('[Database] Connection Error:', err.message);
+    console.error('[Database] Connection Error:', err.name || 'MongoConnectionError');
+    console.error('[Database] Details:', err.message);
+    console.error('[Database] Check MONGODB_URI, Atlas network access, database user credentials, and URL-encoded password characters.');
     process.exit(1);
   });

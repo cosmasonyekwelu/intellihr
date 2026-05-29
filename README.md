@@ -237,6 +237,15 @@ Backend web service:
 - Build command: `npm ci --include=dev && npm run build`
 - Start command: `npm start`
 - Required env vars: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGIN`
+- Recommended env var: `NODE_VERSION=20`
+
+MongoDB Atlas setup for Render:
+
+- Use a MongoDB Atlas connection string, not `mongodb://127.0.0.1:27017/...`.
+- Add a database user with read/write access.
+- URL-encode special characters in the database password.
+- In Atlas Network Access, allow Render outbound access. For a quick deploy, add `0.0.0.0/0`; tighten this later if your plan supports stable outbound IPs.
+- Include the database name in the URI, for example `mongodb+srv://USER:PASSWORD@cluster.xxxxx.mongodb.net/intellihr?retryWrites=true&w=majority`.
 
 Frontend static site:
 
